@@ -1,0 +1,747 @@
+module LCMsim_v2
+
+using CSV
+using HDF5
+using JLD2
+using ProgressMeter
+using Dates
+
+include( "constants.jl")
+include("structs.jl")
+include("preparation/transform_bdf.jl")
+include("preparation/parse_mesh.jl")
+include("preparation/meshUtils.jl")
+include("ioUtils.jl")
+include("preparation/simUtils.jl")
+include("models/abstract_model.jl")
+include("models/model_1.jl")
+include("models/model_2_3.jl")
+include("models/model_2.jl")
+include("models/model_3.jl")
+
+export create, create_and_solve, solve_from_binary, Verbosity, solve, LcmCase, State, Mesh, AbstractModel, ModelType
+
+"""
+    create(
+        meshfile::String,
+        partfile::String,
+        simfile::String,
+        i_model::ModelType,
+    )::LcmCase
+
+    Creates a mesh, a model and an initial state from the given files.
+    The model is chosen according to the given i_model.
+
+    Returns a LcmCase struct.
+"""
+function create(
+    meshfile::String,
+    partfile::String,
+    simfile::String,
+    i_model::ModelType,
+)::LcmCase
+
+    mesh = create_LcmMesh(meshfile, partfile)
+    model = create_SimParameters(mesh, simfile, i_model) 
+    state = create_initial_state(mesh, model)
+
+    case = LcmCase(
+        mesh,
+        model,
+        state
+    )
+
+    return case
+end
+
+
+"""
+    create(
+        meshfile::String,
+        partfile::String,
+        simfile::String,
+        i_model::Int,
+        save_path::String,
+    )::LcmCase
+
+    Creates a mesh, a model and an initial state from the given files.
+    The model is chosen according to the given i_model.
+    Creates a working directory named lcmsim + current date and time at the given save_path.
+    Saves the mesh and the initial state in hdf format.
+    Saves the LcmCase as binary in jld2 format.
+
+    Returns the LcmCase struct.
+"""
+function create(
+    meshfile::String,
+    partfile::String,
+    simfile::String,
+    i_model::Int,
+    save_path::String,
+)::LcmCase
+
+    # check if path exists and get paths to data.h5 and data.jld2
+    hdf_path, jld2_path = check_path(save_path)
+
+    case = create(
+        meshfile,
+        partfile,
+        simfile,
+        i_model
+    )
+
+    # save mesh
+    save_plottable_mesh(case.mesh, hdf_path)
+
+    # save initial state
+    save_state(case.state, hdf_path)
+
+    # save case as jld2
+    save(jld2_path, "LcmCase", case)
+
+    return case
+end
+
+
+"""
+    create_and_solve(
+        save_path::String,
+        meshfile::String,
+        partfile::String,
+        simfile::String,
+        i_model::Int,
+        t_max::Float64,
+        t_step::Float64,
+        verbosity=verbose::Verbosity
+    )::Nothing
+
+    Creates a mesh, a model and an initial state from the given files.
+    The model is chosen according to the given i_model.
+    Then solves the problem up to the specified end time.
+    Saves results in hdf5 format at the specified time steps.
+    If t_step is not given, it is set to t_max, aka the results are only saved at the end.
+    Additionally saves the resulting LcmCase as binary in jld2 format.
+"""
+function create_and_solve(
+    save_path::String,
+    meshfile::String,
+    partfile::String,
+    simfile::String,
+    i_model::Int,
+    t_max::Float64,
+    t_step=Float64(0.0),
+    verbosity=verbose::Verbosity
+)::Nothing
+
+    # check if path exists and get paths to data.h5 and data.jld2
+    hdf_path, jld2_path = check_path(save_path)
+
+    # create and save case
+    case = create(
+        meshfile,
+        partfile,
+        simfile,
+        i_model,
+        save_path
+    )
+    # retrieve initial state
+    state = case.state
+
+    # if t_step is not given, set it to t_max
+    if t_step <= 0.0
+        t_step = t_max
+    end
+
+    if verbosity == verbose::Verbosity
+        log_license()
+        # TODO log simulation parameters
+    end
+
+    t_next = 0.0
+    while t_next < t_max
+        t_next += t_step
+        state = solve(case.model, case.mesh, state, t_next, verbosity)
+
+        # append state to previously created hdf file
+        save_state(state, hdf_path)
+    end
+
+    # save end_case as jld2
+    end_case = LcmCase(
+        case.mesh,
+        case.model,
+        state
+    )
+    save(jld2_path, "LcmCase", end_case)
+end
+
+
+"""
+    solve_from_binary(
+        source_path::String,
+        save_path::String,
+        t_max::Float64,
+        t_step::Float64,
+        verbosity=verbose::Verbosity
+    )::Nothing
+
+    This function allows to continue a simulation from a previously saved LcmCase.
+    Solves the problem up to the specified end time.
+    Saves results in hdf5 format at the specified time steps.
+    If t_step is not given, it is set to t_max, aka the results are only saved at the end.
+    Additionally saves the resulting LcmCase as binary in jld2 format.
+"""
+function solve_from_binary(
+    source_path::String,
+    save_path::String,
+    t_max::Float64,
+    t_step=Float64(0.0),
+    verbosity=verbose::Verbosity
+)::Nothing
+    # check if path exists and get paths to data.h5 and data.jld2
+    hdf_path, jld2_path = check_path(save_path)
+
+    case = load_case(source_path)
+    # retrieve initial state
+    state = case.state
+
+    save_plottable_mesh(case.mesh, hdf_path)
+
+    # if t_step is not given, set it to t_max
+    if t_step <= 0.0
+        t_step = t_max
+    end
+
+    t_next = state.t
+    while t_next < t_max
+        t_next += t_step
+        state = solve(case.model, case.mesh, state, t_next, verbosity)
+
+        # append state to previously created hdf file
+        save_state(state, hdf_path)
+    end
+
+    # save end_case as jld2
+    end_case = LcmCase(
+        case.mesh,
+        case.model,
+        state
+    )
+    save(jld2_path, "LcmCase", end_case)
+end
+
+"""
+    solve(
+        case::LcmCase,
+        t_max::Float64
+    )::LcmCase
+
+    Solves the problem for the given LcmCase up to the specified end time.
+    Returns the new LcmCase.
+"""
+function solve(
+    case::LcmCase,
+    t_max::Float64,
+    verbosity=silent::Verbosity
+)::LcmCase
+    state = case.state
+    state = solve(case.model, case.mesh, state, t_max, verbosity)
+    return LcmCase(
+        case.mesh,
+        case.model,
+        state
+    )
+end
+
+
+##################################################################################################
+# INTERNAL FUNCTIONS
+##################################################################################################
+
+function numerical_gradient(i_method::Int, cell::LcmCell, p_old::Vector{Float64})::Point2{Float64}
+    if i_method == 1
+        #least square solution to determine gradient
+        bvec = Vector{Float64}(undef, cell.num_neighbours)
+        Amat = Array{Float64}(undef, cell.num_neighbours, 2)
+        for (i_neighbour, neighbour) in enumerate(cell.neighbours)
+            i_P = cell.id
+            i_A = neighbour.id
+            Amat[i_neighbour, :] = neighbour.toCenter
+            bvec[i_neighbour] = p_old[i_A] - p_old[i_P]
+        end
+
+        if cell.num_neighbours > 1
+            ∇p = Amat \ bvec
+        else
+            ∇p = [0.; 0.]
+        end
+    elseif i_method == 2
+        #least square solution to determine gradient with limiter
+        bvec = Vector{Float64}(undef, cell.num_neighbours)
+        Amat = Array{Float64}(undef, cell.num_neighbours, 2)
+        for (i_neighbour, neighbour) in enumerate(cell.neighbours)
+            i_P = cell.id
+            i_A = neighbour.id
+            exp_limiter = 2
+            wi = 1 / norm(neighbour.toCenter) ^ exp_limiter
+            Amat[i_neighbour, :] = wi .* neighbour.toCenter
+            bvec[i_neighbour] = wi * (p_old[i_A] - p_old[i_P])
+        end
+
+        if cell.num_neighbours > 1
+            ∇p = Amat \ bvec
+        else
+            ∇p = [0.; 0.]
+        end
+    elseif i_method == 3
+        #least square solution to determine gradient - runtime optimized
+        bvec = Vector{Float64}(undef, cell.num_neighbours)
+        Amat = Array{Float64}(undef, cell.num_neighbours, 2)
+        for (i_neighbour, neighbour) in enumerate(cell.neighbours)
+            i_P = cell.id
+            i_A = neighbour.id
+            Amat[i_neighbour, :] = neighbour.toCenter
+            bvec[i_neighbour] = p_old[i_A] - p_old[i_P]
+        end
+
+        if cell.num_neighbours > 1
+            Aplus = transpose(Amat) * Amat
+            a = Aplus[1, 1]
+            b = Aplus[1, 2]
+            c = Aplus[2, 1]
+            d = Aplus[2, 2]
+            bvec_mod = transpose(Amat) * bvec
+            inv = 1 / (a * d - b * c)
+            # 1 / (ad -bc) * [d -b; -c a]
+            dpdx = inv * d * bvec_mod[1] - inv * b * bvec_mod[2]
+            dpdy = -inv * c * bvec_mod[1] + inv * a * bvec_mod[2]
+            ∇p = [dpdx; dpdy]
+        else
+            ∇p = [0.; 0.]
+        end
+
+    end
+
+    return Point2{Float64}(∇p)
+end
+
+function numerical_flux_function(i_method, vars_P, vars_A, face_normal, A)::Vector{Float64}
+    if i_method == 1
+        #first order upwinding
+        rho_P = vars_P[1]
+        u_P = vars_P[2]
+        v_P = vars_P[3]
+        gamma_P = vars_P[4]
+
+        rho_A = vars_A[1]
+        u_A = vars_A[2]
+        v_A = vars_A[3]
+        gamma_A = vars_A[4]
+
+        n_dot_rhou1 = dot(face_normal, 0.5 * (rho_P + rho_A) * [0.5 * (u_P + u_A); 0.5 * (v_P + v_A)])
+        n_dot_rhou = n_dot_rhou1
+        phi = 1
+        F_rho_num_add = n_dot_rhou * phi * A
+        if n_dot_rhou1 >= 0
+            phi = u_P
+        else
+            phi = u_A
+        end
+        F_u_num_add = n_dot_rhou * phi * A
+        if n_dot_rhou1 >= 0
+            phi = v_P
+        else
+            phi = v_A
+        end
+        F_v_num_add = n_dot_rhou * phi * A
+        n_dot_u = dot(face_normal, [0.5 * (u_P + u_A); 0.5 * (v_P + v_A)])
+        if n_dot_rhou1 >= 0
+            phi = gamma_P
+        else
+            phi = gamma_A
+        end
+        F_gamma_num_add = n_dot_u * phi * A
+        phi = 1
+        F_gamma_num1_add = n_dot_u * phi * A
+    end
+    return [F_rho_num_add, F_u_num_add, F_v_num_add, F_gamma_num_add, F_gamma_num1_add]
+end
+
+function numerical_flux_function_boundary(i_method, vars_P, vars_A, A, n_dot_u)::Vector{Float64}
+    if i_method == 1
+        #first order upwinding
+        rho_P = vars_P[1]
+        u_P = vars_P[2]
+        v_P = vars_P[3]
+        gamma_P = vars_P[4]
+        rho_A = vars_A[1]
+        u_A = vars_A[2]
+        v_A = vars_A[3]
+        gamma_A = vars_A[4]
+        n_dot_rhou = n_dot_u * 0.5 * (rho_A + rho_P)
+        phi = 1
+        F_rho_num_add = n_dot_rhou * phi * A
+        if n_dot_u <= 0
+            phi = u_A
+        else
+            phi = u_P
+        end
+        F_u_num_add = n_dot_rhou * phi * A
+        if n_dot_u <= 0
+            phi = v_A
+        else
+            phi = v_P
+        end
+        F_v_num_add = n_dot_rhou * phi * A
+        if n_dot_u <= 0
+            phi = gamma_A
+        else
+            phi = gamma_P
+        end
+        F_gamma_num_add = n_dot_u * phi * A
+        phi = 1
+        F_gamma_num1_add = n_dot_u * phi * A
+    end
+    return [F_rho_num_add, F_u_num_add, F_v_num_add, F_gamma_num_add, F_gamma_num1_add]
+end
+
+"""
+    aggregate_neighour_flux(
+        cell::LcmCell,
+        scaled_properties::ScaledProperties,
+        mesh::LcmMesh,
+        ∇p::Point2{Float64},
+        rho_old::Vector{Float64},
+        u_old::Vector{Float64},
+        v_old::Vector{Float64},
+        gamma_old::Vector{Float64}
+    )::Tuple{Float64, Float64, Float64, Float64, Float64}
+
+    Aggregates the neighbour flux numerically for the given cell and scaled properties.
+    Returns a tuple of the aggregated fluxes:
+        F_rho_num, 
+        F_u_num, 
+        F_v_num, 
+        F_gamma_num, 
+        F_gamma_num1
+"""
+function aggregate_neighour_flux(
+    cell::LcmCell,
+    scaled_properties::ScaledProperties,
+    mesh::LcmMesh,
+    ∇p::Point2{Float64},
+    rho_old::Vector{Float64},
+    u_old::Vector{Float64},
+    v_old::Vector{Float64},
+    gamma_old::Vector{Float64},
+)::Tuple{Float64, Float64, Float64, Float64, Float64} 
+
+    # corresponds to [F_rho_num, F_u_num, F_rho_num, F_gamma_num, F_gamma_num1]
+    numerical_flux = zeros(Float64, 5)
+
+    for (i_neighbour, neighbour) in enumerate(cell.neighbours)
+        # transform old u, v of neighbour into this cell's coordinates
+        uvec = neighbour.transformation * [u_old[neighbour.id]; v_old[neighbour.id]]
+        u_A = uvec[1]
+        v_A = uvec[2]
+    
+        vars_P = [
+            rho_old[cell.id], 
+            u_old[cell.id], 
+            v_old[cell.id], 
+            gamma_old[cell.id]
+        ]
+        
+        vars_A = [
+            rho_old[neighbour.id], 
+            u_A,
+            v_A, 
+            gamma_old[neighbour.id]
+        ]
+
+        # scaled face area of i-th neighbour
+        A = scaled_properties.face[i_neighbour]
+
+        neighbour_cell = mesh.cells[neighbour.id]
+        neighbour_type = neighbour_cell.type
+        if neighbour_type == inner::CELLTYPE || neighbour_type == wall::CELLTYPE
+
+            numerical_flux .+= numerical_flux_function(1, vars_P, vars_A, neighbour.face_normal, A)
+           
+        elseif neighbour_type == inlet::CELLTYPE || neighbour_type == outlet::CELLTYPE
+
+            A = A * cell.thickness / (0.5 * (cell.thickness + neighbour_cell.thickness)) # TODO thickness Factor?
+
+            if neighbour_type == outlet::CELLTYPE
+
+                n_dot_u = dot(neighbour.face_normal, [u_old[cell.id]; v_old[cell.id]])
+
+            elseif neighbour_type == inlet::CELLTYPE
+
+                n_dot_u = min(
+                    0, 
+                    -1 / scaled_properties.viscosity * dot(
+                        [scaled_properties.permeability 0; 0 scaled_properties.permeability * cell.alpha] * ∇p, # <=> [k1; k2] .* ∇p
+                        neighbour.face_normal
+                    )
+                )  #inflow according to Darcy's law and no backflow possible
+            end
+            numerical_flux .+= numerical_flux_function_boundary(1, vars_P, vars_A, A, n_dot_u)
+        end
+    end
+
+    F_rho_num = numerical_flux[1]
+    F_u_num = numerical_flux[2]
+    F_v_num = numerical_flux[3]
+    F_gamma_num = numerical_flux[4]
+    F_gamma_num1 = numerical_flux[5]
+
+    return F_rho_num, F_u_num, F_v_num, F_gamma_num, F_gamma_num1
+end
+
+"""
+    adaptive_timestep(
+        model::AbstractModel,
+        cells::Vector{LcmCell},
+        u_new::Vector{Float64},
+        v_new::Vector{Float64},
+        Δt
+    )::Float64
+
+    Calculates the adaptive time step for the given model and cells.
+    Takes all cells given in account.
+
+"""
+function adaptive_timestep(
+    model::AbstractModel,
+    cells::Vector{LcmCell},
+    u_new::Vector{Float64},
+    v_new::Vector{Float64},
+    Δt
+)::Float64      
+    α =0.1;
+    min_val = Inf64
+    for cell in cells
+        min_val = min(
+            min_val, 
+            cell.area / (u_new[cell.id]^2 + v_new[cell.id]^2)
+        ) 
+    end
+    # removed sqrt from loop, since it should changed the 
+    # index of the minimum and only apply it afterwards
+    Δt = (1 - α) * Δt + α * model.betat2 * sqrt(min_val)
+    return Δt
+end
+
+"""
+    solve(
+        model::AbstractModel,
+        mesh::LcmMesh,
+        old_state::State,
+        t_next::Float64,
+        debug_frequency=nothing, 
+        fixed_deltat=nothing,
+        verbosity=verbose::Verbosity
+    )::State
+
+    Internal solve function. Not necessesarily meant for end users, use convenience interface instead.
+    Solves the problem for the given model, mesh, old state and next time.
+    Returns the new state.
+"""
+function solve(
+    model::AbstractModel,
+    mesh::LcmMesh,
+    old_state::State,
+    t_next::Float64,
+    verbosity=silent::Verbosity,
+    debug_frequency=nothing, 
+    fixed_deltat=nothing
+)::State
+
+    # retrieve info from old state
+    iter = old_state.iter
+    t = old_state.t
+    if isnothing(fixed_deltat)
+        Δt = old_state.deltat
+    else
+        Δt = fixed_deltat
+    end
+
+    p_old = old_state.p
+    rho_old = old_state.rho
+    u_old = old_state.u
+    v_old = old_state.v
+    gamma_old = old_state.gamma
+    viscosity = old_state.viscosity
+    cellporositytimesporosityfactor_old = old_state.porosity_times_porosity
+
+    # vectors for new state
+    p_new = zeros(Float64, mesh.N)
+    rho_new = zeros(Float64, mesh.N)
+    u_new = zeros(Float64, mesh.N)
+    v_new = zeros(Float64, mesh.N)
+    gamma_new = zeros(Float64, mesh.N)
+
+    if verbosity == verbose::Verbosity
+        @info "Start solving at t = $t."
+        progress = ProgressMeter.Progress(100; desc="Solving", showspeed=true)
+    end
+
+    # time evolution
+    while t <= t_next
+        
+        # iterate over cells, that are neither an inlet nor an outlet
+        for cell in mesh.cells[mesh.textile_cell_ids]
+
+            # calculate factors for this cell and scale properties (only applies to model 3)
+            scaled_properties = scale_properties(
+                model, 
+                cell, 
+                p_old[cell.id], 
+                cellporositytimesporosityfactor_old[cell.id], 
+                viscosity[cell.id],
+                iter
+            )
+
+            # calculate pressure gradient
+            ∇p = numerical_gradient(3, cell, p_old)
+
+            # aggregate neighbour flux numerically
+            F_rho_num, F_u_num, F_v_num, F_gamma_num, F_gamma_num1 = aggregate_neighour_flux(
+                cell,
+                scaled_properties,
+                mesh,
+                ∇p,
+                rho_old,
+                u_old,
+                v_old,
+                gamma_old
+            )
+
+            # calculate new state
+            rho_new[cell.id] = update_rho(
+                model,
+                Δt,
+                scaled_properties,
+                rho_old[cell.id],
+                F_rho_num,
+                cellporositytimesporosityfactor_old[cell.id]
+            )
+
+            cellporositytimesporosityfactor_old[cell.id] = update_porosity_times_porosity(
+                model,
+                scaled_properties
+            )
+
+            u_new[cell.id] = update_u(
+                model,
+                Δt,
+                scaled_properties,
+                ∇p,
+                rho_old[cell.id],
+                rho_new[cell.id],
+                F_u_num,
+                u_old[cell.id]
+            )
+
+            v_new[cell.id] = update_v(
+                model,
+                Δt,
+                scaled_properties,
+                ∇p,
+                rho_old[cell.id],
+                rho_new[cell.id],
+                F_v_num,
+                v_old[cell.id]
+            )
+
+            p_new[cell.id] = update_p(
+                model,
+                mesh, 
+                rho_new[cell.id],
+                scaled_properties
+            )
+
+            gamma_new[cell.id] = update_gamma(
+                model,
+                Δt,
+                scaled_properties,
+                gamma_old[cell.id],
+                rho_new[cell.id],
+                F_gamma_num,
+                F_gamma_num1
+            )
+
+            viscosity[cell.id] = update_viscosity(
+                model,
+                scaled_properties
+            )
+        end
+
+        #boundary conditions, only for pressure boundary conditions
+        # TODO implement possible viscosity boundary conditions
+        p_new[mesh.inlet_cell_ids] .= model.p_a
+        u_new[mesh.inlet_cell_ids] .= U_A
+        v_new[mesh.inlet_cell_ids] .= V_A
+        rho_new[mesh.inlet_cell_ids] .= model.rho_a
+        gamma_new[mesh.inlet_cell_ids] .= GAMMA_A
+        p_new[mesh.outlet_cell_ids] .= model.p_init
+        u_new[mesh.outlet_cell_ids] .= U_INIT
+        v_new[mesh.outlet_cell_ids] .= V_INIT
+        rho_new[mesh.outlet_cell_ids] .= model.rho_init
+        gamma_new[mesh.outlet_cell_ids] .= GAMMA_INIT
+
+        #prepare arrays for next time step
+        u_old .= u_new
+        v_old .= v_new
+        rho_old .= rho_new
+        p_old .= p_new
+        gamma_old .= gamma_new
+
+        # Δt calculation
+        if isnothing(fixed_deltat)
+            Δt = adaptive_timestep(
+                model,
+                mesh.cells[mesh.textile_cell_ids],
+                u_new,
+                v_new,
+                Δt
+            )
+        end
+
+        if verbosity == verbose::Verbosity
+            percent = round(Int, 100 * t / t_next)
+            if percent < 100
+                ProgressMeter.update!(progress, percent)
+            end
+        end
+        
+        iter = iter + 1
+        t = t + Δt
+
+        # for debugging
+        if !isnothing(debug_frequency) && (iter - 1) % debug_frequency == 0
+            break
+        end
+    end
+
+    if verbosity == verbose::Verbosity
+        ProgressMeter.finish!(progress)
+        @info "Solving finished at t = $t."
+    end
+
+    # create state to return
+    return State(
+        t,
+        iter,
+        Δt,
+        p_new,
+        gamma_new,
+        rho_new,
+        u_new,
+        v_new,
+        viscosity,
+        cellporositytimesporosityfactor_old
+    )
+end
+end # module LcmSimCore
