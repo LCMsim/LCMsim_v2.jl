@@ -268,13 +268,13 @@ function parse_mesh(meshfile::String)
     N = 0
 
     if file_extension == ".bdf"
-        @info "PARSE GMSH"
+        @debug "PARSE GMSH"
         cellgridid, vertices, pids, N = __parse_gmsh(meshfile)
     elseif file_extension == ".hm"
-        @info "PARSE HyperMesh"
+        @debug "PARSE HyperMesh"
         cellgridid, vertices, pids, N = __parse_HyperMesh(meshfile)
     elseif file_extension == ".inp"
-        @info "PARSE Abaqus"
+        @debug "PARSE Abaqus"
         cellgridid, vertices, pids, N = __parse_abaqus(meshfile)
     else
         @error "File extension not supported."
