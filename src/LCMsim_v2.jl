@@ -19,14 +19,26 @@ include("models/model_2_3.jl")
 include("models/model_2.jl")
 include("models/model_3.jl")
 
-export create, create_and_solve, solve_from_binary, Verbosity, solve, LcmCase, State, Mesh, AbstractModel, ModelType
+export create, 
+create_and_solve,
+Verbosity, 
+solve, 
+LcmCase, 
+State, 
+Mesh, 
+AbstractModel, 
+ModelType, 
+save_plottable_mesh, 
+save_state, 
+save_case, 
+load_case
 
 """
     create(
         meshfile::String,
         partfile::String,
         simfile::String,
-        i_model::ModelType,
+        i_model::ModelType
     )::LcmCase
 
     Creates a mesh, a model and an initial state from the given files.
@@ -38,7 +50,7 @@ function create(
     meshfile::String,
     partfile::String,
     simfile::String,
-    i_model::ModelType,
+    i_model::ModelType
 )::LcmCase
 
     mesh = create_LcmMesh(meshfile, partfile)
@@ -62,11 +74,12 @@ end
         simfile::String,
         i_model::Int,
         save_path::String,
+        save_binary::Bool=true,
+        save_hdf::Bool=true
     )::LcmCase
 
     Creates a mesh, a model and an initial state from the given files.
     The model is chosen according to the given i_model.
-    Creates a working directory named lcmsim + current date and time at the given save_path.
     Saves the mesh and the initial state in hdf format.
     Saves the LcmCase as binary in jld2 format.
 
@@ -78,6 +91,8 @@ function create(
     simfile::String,
     i_model::Int,
     save_path::String,
+    save_binary::Bool=true,
+    save_hdf::Bool=true
 )::LcmCase
 
     # check if path exists and get paths to data.h5 and data.jld2
@@ -90,14 +105,14 @@ function create(
         i_model
     )
 
-    # save mesh
-    save_plottable_mesh(case.mesh, hdf_path)
+    if save_hdf
+        save_plottable_mesh(case.mesh, hdf_path)
+        save_state(case.state, hdf_path)
+    end
 
-    # save initial state
-    save_state(case.state, hdf_path)
-
-    # save case as jld2
-    save(jld2_path, "LcmCase", case)
+    if save_binary
+        save_case(case, jld2_path)
+    end
 
     return case
 end
@@ -112,7 +127,9 @@ end
         i_model::Int,
         t_max::Float64,
         t_step::Float64,
-        verbosity=verbose::Verbosity
+        verbosity=verbose::Verbosity,
+        save_binary::Bool=true,
+        save_hdf::Bool=true
     )::Nothing
 
     Creates a mesh, a model and an initial state from the given files.
@@ -130,7 +147,9 @@ function create_and_solve(
     i_model::Int,
     t_max::Float64,
     t_step=Float64(0.0),
-    verbosity=verbose::Verbosity
+    verbosity=verbose::Verbosity,
+    save_binary::Bool=true,
+    save_hdf::Bool=true  
 )::Nothing
 
     # check if path exists and get paths to data.h5 and data.jld2
@@ -147,6 +166,10 @@ function create_and_solve(
     # retrieve initial state
     state = case.state
 
+    if save_hdf
+        save_plottable_mesh(case.mesh, hdf_path)
+    end
+
     # if t_step is not given, set it to t_max
     if t_step <= 0.0
         t_step = t_max
@@ -162,8 +185,10 @@ function create_and_solve(
         t_next += t_step
         state = solve(case.model, case.mesh, state, t_next, verbosity)
 
-        # append state to previously created hdf file
-        save_state(state, hdf_path)
+        if save_hdf
+            # append state to previously created hdf file
+            save_state(state, hdf_path)
+        end
     end
 
     # save end_case as jld2
@@ -172,31 +197,37 @@ function create_and_solve(
         case.model,
         state
     )
-    save(jld2_path, "LcmCase", end_case)
+    if save_binary
+        save_case(end_case, jld2_path)
+    end
 end
 
 
 """
-    solve_from_binary(
+    solve(
         source_path::String,
         save_path::String,
         t_max::Float64,
         t_step::Float64,
-        verbosity=verbose::Verbosity
+        verbosity=verbose::Verbosity,
+        save_binary::Bool=true,
+        save_hdf::Bool=true
     )::Nothing
 
-    This function allows to continue a simulation from a previously saved LcmCase.
+    This function allows to continue a simulation from a previously in binary saved LcmCase.
     Solves the problem up to the specified end time.
     Saves results in hdf5 format at the specified time steps.
-    If t_step is not given, it is set to t_max, aka the results are only saved at the end.
+    If t_step is given to be zero, it is set to t_max, aka the results are only saved at the end.
     Additionally saves the resulting LcmCase as binary in jld2 format.
 """
-function solve_from_binary(
+function solve(
     source_path::String,
     save_path::String,
     t_max::Float64,
     t_step=Float64(0.0),
-    verbosity=verbose::Verbosity
+    verbosity=verbose::Verbosity,
+    save_binary::Bool=true,
+    save_hdf::Bool=true
 )::Nothing
     # check if path exists and get paths to data.h5 and data.jld2
     hdf_path, jld2_path = check_path(save_path)
@@ -205,7 +236,9 @@ function solve_from_binary(
     # retrieve initial state
     state = case.state
 
-    save_plottable_mesh(case.mesh, hdf_path)
+    if save_hdf
+        save_plottable_mesh(case.mesh, hdf_path)
+    end
 
     # if t_step is not given, set it to t_max
     if t_step <= 0.0
@@ -217,8 +250,10 @@ function solve_from_binary(
         t_next += t_step
         state = solve(case.model, case.mesh, state, t_next, verbosity)
 
-        # append state to previously created hdf file
-        save_state(state, hdf_path)
+        if save_hdf
+            # append state to previously created hdf file
+            save_state(state, hdf_path)
+        end
     end
 
     # save end_case as jld2
@@ -227,7 +262,9 @@ function solve_from_binary(
         case.model,
         state
     )
-    save(jld2_path, "LcmCase", end_case)
+    if save_binary
+        save_case(end_case, jld2_path)
+    end
 end
 
 """
@@ -547,6 +584,8 @@ end
     Internal solve function. Not necessesarily meant for end users, use convenience interface instead.
     Solves the problem for the given model, mesh, old state and next time.
     Returns the new state.
+    Allows to set a fixed time step, which will overwrite the adaptive time step.
+    Allows to set a debug frequency, which will return the state after the given number of iterations.
 """
 function solve(
     model::AbstractModel,

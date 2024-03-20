@@ -241,6 +241,10 @@ end
     struct LcmMesh
 
 A struct representing a mesh in the LCM simulation.
+Note that the ordering of the cells in the `cells` field is important and should 
+be consistent with the LcmCell IDs. Else the indices in the `NamedPart` structs 
+and the `textile_cell_ids`, `inlet_cell_ids`, and `outlet_cell_ids` fields will 
+not be correct, since they refer to the position of the cell in the `cells` field.
 
 # Fields
 - `N::Int`: The number of vertices in the mesh.

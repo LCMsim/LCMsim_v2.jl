@@ -23,16 +23,8 @@ function write_datasets(parent::Union{HDF5.File,HDF5.Group}, datasets)::Nothing
 end
 
 """
-    get_last_state(meshfile::HDF5.File)::State
+    saveLcmMesh(mesh::LcmMesh, filename::String)
 
-    Returns the key of the last state group (aka the state with the highest iteration counter).
-"""
-function get_last_state(meshfile::HDF5.File)::State
-    states = keys(meshfile[GROUP_SIMULATION])
-    return last(sort(states))
-end
-
-"""
     Saves a LcmMesh struct instance in hdf-format.
 """
 function saveLcmMesh(mesh::LcmMesh, filename::String)
@@ -138,7 +130,7 @@ end
     )::Nothing
 
     Requires an existing hdf5 file and a state struct.
-    Creates a group named ("state%09i", iter) at meshfile["/simulation"] and
+    Creates a group named ("state%09i", iter) at meshfile["/"] and
     writes state attributes/ datasets to it.
 
     Example: iter = 1 -> "state000000001"
@@ -167,6 +159,7 @@ function save_state(
                 (HDF_U, state.u),
                 (HDF_V, state.v),
                 (HDF_GAMMA, state.gamma),
+                (HDF_VISCOSITY, state.viscosity),
                 (HDF_CELLPOROSITYTIMESCELLPOROSITY_FACTOR, state.porosity_times_porosity)
             ]
         )
@@ -204,6 +197,19 @@ function load_case(path::String)::LcmCase
 
     # extract the LcmCase object
     return jld2file["LcmCase"]
+end
+
+"""
+    save_case(case::LcmCase, path::String)::Nothing
+
+    Saves a LcmCase object to a jld2 file.
+"""
+function save_case(case::LcmCase, path::String)::Nothing
+    # assert that path exists
+    @assert isdir(path) "The given path does not exist."
+
+    # save the LcmCase object
+    JLD2.save(path * "/data.jld2", "LcmCase", case)
 end
 
 # funtion to log license and version
