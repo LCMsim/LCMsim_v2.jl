@@ -22,6 +22,7 @@ include("models/model_3.jl")
 export create, 
 create_and_solve,
 Verbosity, 
+apply_pressure,
 solve, 
 LcmCase, 
 State, 
@@ -298,7 +299,7 @@ end
 
     Applies actions consisting of a part name and a pressure value to the given LcmCase. 
     One action is a tuple of a part name and a pressure value.
-    For every inlet and outlet, an action needs to be provided.
+    For every existing inlet and outlet, an action needs to be provided.
     Returns the new LcmCase.
 """
 function apply_pressure(
@@ -347,16 +348,15 @@ end
 
 """
     solve(
-    case::LcmCase,
-    t_max::Float64,
-    actions::Vector{Tuple{String, Float64}},
-    verbosity=silent::Verbosity
-)::LcmCase
+        case::LcmCase,
+        t_max::Float64,
+        actions::Vector{Tuple{String, Float64}},
+        verbosity=silent::Verbosity
+    )::LcmCase
 
-    Solves the problem for the given LcmCase up to the specified end time.
-    Applies actions consisting of a part name and a pressure value to the given LcmCase. 
+    Applies pressure actions and solves the problem for the given LcmCase up to the specified end time.
     One action is a tuple of a part name and a pressure value.
-    For every inlet and outlet, an action needs to be provided.
+    For every existing inlet and outlet, an action needs to be provided.
     Returns the new LcmCase.
 """
 function solve(

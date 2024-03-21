@@ -213,6 +213,19 @@ Solve the given LcmCase up to the specified end time. If you want to receive sim
 
 ```
 solve(
+    case::LcmCase,
+    t_max::Float64,
+    actions::Vector{Tuple{String, Float64}},
+    verbosity=silent::Verbosity
+)::LcmCase
+```
+Applies pressure actions and solves the problem for the given LcmCase up to the specified end time.
+One action is a tuple of a part name and a pressure value.
+For every existing inlet and outlet, an action needs to be provided.
+Returns the new LcmCase.
+
+```
+solve(
     source_path::String,
     save_path::String,
     t_max::Float64,
@@ -238,3 +251,4 @@ solve(
 )::Nothing
 ````
 Convenience function the behaves like `create` and `solve`.
+
