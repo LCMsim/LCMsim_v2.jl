@@ -290,6 +290,84 @@ function solve(
     )
 end
 
+"""
+    apply_pressure(
+        case::LcmCase,
+        actions::Vector{Tuple{String, Float64}}
+    )::LcmCase
+
+    Applies actions consisting of a part name and a pressure value to the given LcmCase. 
+    One action is a tuple of a part name and a pressure value.
+    For every inlet and outlet, an action needs to be provided.
+    Returns the new LcmCase.
+"""
+function apply_pressure(
+    case::LcmCase,
+    actions::Vector{Tuple{String, Float64}}
+)::LcmCase
+    given_names = sort([action[1] for action in actions])
+    existing_names = sort(part.name for part in case.mesh.named_parts)
+
+    @assert given_names == existing_names "Given names do not match existing names."
+
+    p = zeros(Float64, case.mesh.N) + case.state.p
+    u = zeros(Float64, case.mesh.N) + case.state.u
+    v = zeros(Float64, case.mesh.N) + case.state.v
+    rho = zeros(Float64, case.mesh.N) + case.state.rho
+    gamma = zeros(Float64, case.mesh.N) + case.state.gamma
+    viscosity = zeros(Float64, case.mesh.N) + case.state.viscosity
+    porosity_times_porosity = zeros(Float64, case.mesh.N) + case.state.porosity_times_porosity
+
+    for action in actions
+        part = findfirst(part -> part.name == action[1], case.mesh.named_parts)
+        for cell in case.mesh.cells[part.cell_ids]
+            p[cell.id] .= action[2]
+        end
+    end
+
+    new_state = State(
+        case.state.t,
+        case.state.iter,
+        case.state.deltat,
+        p,
+        gamma,
+        rho,
+        u,
+        v,
+        viscosity,
+        porosity_times_porosity
+    )
+
+    return LcmCase(
+        case.mesh,
+        case.model,
+        new_state
+    )
+end
+
+"""
+    solve(
+    case::LcmCase,
+    t_max::Float64,
+    actions::Vector{Tuple{String, Float64}},
+    verbosity=silent::Verbosity
+)::LcmCase
+
+    Solves the problem for the given LcmCase up to the specified end time.
+    Applies actions consisting of a part name and a pressure value to the given LcmCase. 
+    One action is a tuple of a part name and a pressure value.
+    For every inlet and outlet, an action needs to be provided.
+    Returns the new LcmCase.
+"""
+function solve(
+    case::LcmCase,
+    t_max::Float64,
+    actions::Vector{Tuple{String, Float64}},
+    verbosity=silent::Verbosity
+)::LcmCase
+    new_case = apply_pressure(case, actions)
+    return solve(new_case, t_max, verbosity)
+end
 
 ##################################################################################################
 # INTERNAL FUNCTIONS

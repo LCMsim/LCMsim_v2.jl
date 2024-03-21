@@ -253,7 +253,7 @@ not be correct, since they refer to the position of the cell in the `cells` fiel
 - `textile_cell_ids::Vector{Int}`: The cell IDs of the textile cells in the mesh.
 - `inlet_cell_ids::Vector{Int}`: The cell IDs of the inlet cells in the mesh.
 - `outlet_cell_ids::Vector{Int}`: The cell IDs of the outlet cells in the mesh.
-- `named_parts::Vector{NamedPart}`: The named parts of the mesh.
+- `named_parts::Vector{NamedPart}`: The inlets and outlets of the mesh.
 - `permeability_ratio::Float64`: The permeability ratio of the mesh.
 
 """
