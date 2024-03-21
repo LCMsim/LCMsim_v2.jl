@@ -1,4 +1,4 @@
-name = "LCMsim_v2.jl"
+name = "LCMsim_v2"
 uuid = "8943dee9-4600-4ae1-9519-6f6be4b65734"
 authors = ["heberleo <leonard.heber@student.uni-augsburg.de>"]
 version = "0.1.0"
