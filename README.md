@@ -59,6 +59,7 @@ documented, you should be able to adapt the program to your custom needs.
 ### Data structures and artifacts
 When working with LCMsim_v2, you will encounter different in-program data structures and/ or file formats to persistently save simulation results.
 Data structures:
+- ModelType
 - LcmMesh/ LcmCell
 - State
 - AbstractModel
@@ -67,6 +68,17 @@ Data structures:
 Two file formats are used:
 - human-readable results (HDF)
 - binary dump (JLD2)
+
+#### ModelType
+```
+@enum ModelType begin
+    model_1 = 1
+    model_2 = 2
+    model_3 = 3
+end
+````
+This enum lets you choose which physical model is applied by the solver. You'll need to pass it to the `create` function.
+After
 
 #### LcmMesh/ LcmCell
 ```
@@ -245,7 +257,7 @@ create_and_solve(
     meshfile::String,
     partfile::String,
     simfile::String,
-    i_model::Int,
+    i_model::ModelType,
     t_max::Float64,
     t_step::Float64,
     verbosity=verbose::Verbosity,
