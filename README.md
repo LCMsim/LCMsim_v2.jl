@@ -187,7 +187,7 @@ create(
     i_model::ModelType,
 )::LcmCase
 ```
-Function for in-program usage. Takes paths to the meshfile, the part description file and the simulation parameter file Returns a LcmCase instance.
+Function for in-program usage. Takes paths to the meshfile, the part description file and the simulation parameter file. Returns a LcmCase instance.
 
 ```
 create(
@@ -240,9 +240,12 @@ This is a convenience function to start/ continue a simulation from a previously
 
 #### create_and_solve
 ```
-solve(
-    source_path::String,
+create_and_solve(
     save_path::String,
+    meshfile::String,
+    partfile::String,
+    simfile::String,
+    i_model::Int,
     t_max::Float64,
     t_step::Float64,
     verbosity=verbose::Verbosity,
