@@ -219,12 +219,12 @@ Function to also save the results as `data.h5` / `data.jld2` at the given `save_
 solve(
     case::LcmCase,
     t_max::Float64
-)::LcmCase
+)::State
 ```
-Solve the given LcmCase up to the specified end time. If you want to receive simulation results at certain point in time, the usual usage would be to call this function repeatedly while incrementing `t_max` and passing the returned LcmCase back in. If your use case only requires the results at the end, you would invoke the solver only once.
+Solve the given LcmCase up to the specified end time. If you want to receive simulation results at certain point in time, the usual usage would be to call this function repeatedly while incrementing `t_max` and passing the returned State back in (by replacing `case.state`). If your use case only requires the results at the end, you would invoke the solver only once.
 
 ```
-solve(
+solve!(
     case::LcmCase,
     t_max::Float64,
     actions::Vector{Tuple{String, Float64}},
@@ -234,7 +234,8 @@ solve(
 Applies pressure actions and solves the problem for the given LcmCase up to the specified end time.
 One action is a tuple of a part name and a pressure value.
 For every existing inlet and outlet, an action needs to be provided.
-Returns the new LcmCase.
+Mutates the given LcmCase by replacing the state, but does not mutate the old state itself.
+Returns the mutated LcmCase.
 
 ```
 solve(

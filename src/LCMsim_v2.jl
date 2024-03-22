@@ -271,27 +271,21 @@ end
     solve(
         case::LcmCase,
         t_max::Float64
-    )::LcmCase
+    )::State
 
     Solves the problem for the given LcmCase up to the specified end time.
-    Returns the new LcmCase.
+    Returns the new State.
 """
 function solve(
     case::LcmCase,
     t_max::Float64,
     verbosity=silent::Verbosity
 )::LcmCase
-    state = case.state
-    state = solve(case.model, case.mesh, state, t_max, verbosity)
-    return LcmCase(
-        case.mesh,
-        case.model,
-        state
-    )
+    return solve(case.model, case.mesh, case.state, t_max, verbosity)
 end
 
 """
-    apply_pressure(
+    apply_pressure!(
         case::LcmCase,
         actions::Vector{Tuple{String, Float64}}
     )::LcmCase
@@ -299,9 +293,10 @@ end
     Applies actions consisting of a part name and a pressure value to the given LcmCase. 
     One action is a tuple of a part name and a pressure value.
     For every existing inlet and outlet, an action needs to be provided.
-    Returns the new LcmCase.
+    Mutates the given LcmCase by replacing the state, but does not mutate the old state itself.
+    Returns the mutated LcmCase.
 """
-function apply_pressure(
+function apply_pressure!(
     case::LcmCase,
     actions::Vector{Tuple{String, Float64}}
 )::LcmCase
@@ -310,43 +305,22 @@ function apply_pressure(
 
     @assert given_names == existing_names "Given names do not match existing names."
 
-    p = zeros(Float64, case.mesh.N) + case.state.p
-    u = zeros(Float64, case.mesh.N) + case.state.u
-    v = zeros(Float64, case.mesh.N) + case.state.v
-    rho = zeros(Float64, case.mesh.N) + case.state.rho
-    gamma = zeros(Float64, case.mesh.N) + case.state.gamma
-    viscosity = zeros(Float64, case.mesh.N) + case.state.viscosity
-    porosity_times_porosity = zeros(Float64, case.mesh.N) + case.state.porosity_times_porosity
+    state = deepcopy(case.state)
 
     for action in actions
         part = findfirst(part -> part.name == action[1], case.mesh.named_parts)
         for cell in case.mesh.cells[part.cell_ids]
-            p[cell.id] .= action[2]
+            state.p[cell.id] .= action[2]
         end
     end
 
-    new_state = State(
-        case.state.t,
-        case.state.iter,
-        case.state.deltat,
-        p,
-        gamma,
-        rho,
-        u,
-        v,
-        viscosity,
-        porosity_times_porosity
-    )
+    case.state = state
 
-    return LcmCase(
-        case.mesh,
-        case.model,
-        new_state
-    )
+    return case
 end
 
 """
-    solve(
+    solve!(
         case::LcmCase,
         t_max::Float64,
         actions::Vector{Tuple{String, Float64}},
@@ -356,16 +330,18 @@ end
     Applies pressure actions and solves the problem for the given LcmCase up to the specified end time.
     One action is a tuple of a part name and a pressure value.
     For every existing inlet and outlet, an action needs to be provided.
-    Returns the new LcmCase.
+    Mutates the given LcmCase by replacing the state, but does not mutate the old state itself.
+    Returns the mutated LcmCase.
 """
-function solve(
+function solve!(
     case::LcmCase,
     t_max::Float64,
     actions::Vector{Tuple{String, Float64}},
     verbosity=silent::Verbosity
-)::LcmCase
-    new_case = apply_pressure(case, actions)
-    return solve(new_case, t_max, verbosity)
+)::State
+    case = apply_pressure!(case, actions)
+    case.state = solve(case, t_max, verbosity)
+    return case
 end
 
 ##################################################################################################
@@ -683,13 +659,14 @@ function solve(
         Δt = fixed_deltat
     end
 
-    p_old = old_state.p
-    rho_old = old_state.rho
-    u_old = old_state.u
-    v_old = old_state.v
-    gamma_old = old_state.gamma
-    viscosity = old_state.viscosity
-    cellporositytimesporosityfactor_old = old_state.porosity_times_porosity
+    # vectors for old state, do deep copy to not mutate old state
+    p_old = deepcopy(old_state.p)
+    gamma_old = deepcopy(old_state.gamma)
+    rho_old = deepcopy(old_state.rho)
+    u_old = deepcopy(old_state.u)
+    v_old = deepcopy(old_state.v)
+    viscosity = deepcopy(old_state.viscosity)
+    cellporositytimesporosityfactor_old = deepcopy(old_state.porosity_times_porosity)
 
     # vectors for new state
     p_new = zeros(Float64, mesh.N)
