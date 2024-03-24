@@ -139,7 +139,7 @@ function create_LcmMesh(meshfile::String, partfile::String)
     outlet_cells = Vector{Int}(undef, 0)
     textile_cells = Vector{Int}(undef, 0)
     named_parts = Vector{NamedPart}(undef, 0)
-    for part in parts
+    for (pid, part) in parts
         type = part[KEY_TYPE]
         part_id = part[KEY_PART_ID]
         name = part[KEY_NAME]
@@ -541,7 +541,7 @@ function parse_partfile(partfilename::String, allowed_part_ids::Vector{Int})
     @assert all([!all(map(!isequal(String(type)), ["base", "inlet", "outlet", "patch"])) for type in unique(partfile["type"])]) "Invalid type entry in part description file!"
 
     # check for base part
-    parts = []
+    parts = Dict{Int, Dict}()
     base_row = findall(x -> x == "base" ,partfile["type"])
     @assert length(base_row) == 1 "Exactly one part of type \"base\" is needed!"
     base_row = only(base_row)
@@ -613,7 +613,7 @@ function parse_partfile(partfilename::String, allowed_part_ids::Vector{Int})
                 KEY_NAME => partfile["name"][row]
             )
         end
-        push!(parts, part_parameters)
+        parts[pid] = part_parameters
     end
 
     # create entries for pids that are not described in partfile
@@ -623,7 +623,7 @@ function parse_partfile(partfilename::String, allowed_part_ids::Vector{Int})
         part_parameters[KEY_PART_ID] = pid
         part_parameters[KEY_NAME] = "unused_" * string(pid)
         part_parameters[KEY_TYPE] = inner::CELLTYPE
-        push!(parts, part_parameters)
+        parts[pid] = part_parameters
     end
 
     return parts
