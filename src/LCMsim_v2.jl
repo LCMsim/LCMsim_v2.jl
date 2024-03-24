@@ -771,8 +771,9 @@ function solve(
             )
         end
 
-        #boundary conditions, only for pressure boundary conditions
+        # boundary conditions, only for pressure boundary conditions
         # TODO implement possible viscosity boundary conditions
+        # TODO change to reset to old value, important for custom actions
         p_new[mesh.inlet_cell_ids] .= model.p_a
         u_new[mesh.inlet_cell_ids] .= U_A
         v_new[mesh.inlet_cell_ids] .= V_A
@@ -784,7 +785,7 @@ function solve(
         rho_new[mesh.outlet_cell_ids] .= model.rho_init
         gamma_new[mesh.outlet_cell_ids] .= GAMMA_INIT
 
-        #prepare arrays for next time step
+        # prepare arrays for next time step
         u_old .= u_new
         v_old .= v_new
         rho_old .= rho_new
