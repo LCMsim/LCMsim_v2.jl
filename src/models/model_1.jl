@@ -7,7 +7,7 @@ function update_rho(
     cellporositytimescellporosityfactor_old::Float64
     )::Float64
 
-    rho_new =  rho_old- Δt * F_rho_num / props.volume
+    rho_new =  rho_old - Δt * F_rho_num / props.volume
 
     return max(rho_new, 0.0)
 end
