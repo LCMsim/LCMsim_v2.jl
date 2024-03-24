@@ -270,7 +270,7 @@ function parse_mesh(meshfile::String)
     if file_extension == ".bdf"
         @debug "PARSE GMSH"
         cellgridid, vertices, pids, N = __parse_gmsh(meshfile)
-    elseif file_extension == ".hm"
+    elseif file_extension == ".dat"
         @debug "PARSE HyperMesh"
         cellgridid, vertices, pids, N = __parse_HyperMesh(meshfile)
     elseif file_extension == ".inp"

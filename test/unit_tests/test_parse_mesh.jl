@@ -8,7 +8,7 @@ include("../../src/LCMsim_v2.jl")
 
 @testset "Test mesh parsing" begin
     # load correct results
-    HyperMesh_file = "test/unit_tests/test_inputs/permeameter1_HyperMesh.bdf"
+    HyperMesh_file = "test/unit_tests/test_inputs/permeameter1_HyperMesh.dat"
     Gmsh_file = "test/unit_tests/test_inputs/permeameter1_Gmsh.bdf"
     inp_file = "test/unit_tests/test_inputs/mesh_permeameter2_byPrePoMax.inp"
     results_file = "test/unit_tests/true_results/permeameter1.h5" 

@@ -2,7 +2,7 @@ using Test
 include("../integration_test_helper.jl")
 
 function test_result()
-    meshfile = "test/integration_tests/case_2/mesh_permeameter1.hm"
+    meshfile = "test/integration_tests/case_2/mesh_permeameter1.dat"
     partfile = "test/integration_tests/case_2/part_description.csv"
     simfile = "test/integration_tests/case_2/simulation_params.csv"
     true_results = "test/integration_tests/case_2/true_results.h5"

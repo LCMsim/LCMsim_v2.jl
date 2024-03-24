@@ -6,7 +6,7 @@ eps = 1e-20
 
 @testset "test meshUtils" begin
     # load correct results
-    HyperMesh_file = "test/unit_tests/test_inputs/permeameter1_HyperMesh.bdf"
+    HyperMesh_file = "test/unit_tests/test_inputs/permeameter1_HyperMesh.dat"
     Gmsh_file = "test/unit_tests/test_inputs/permeameter1_Gmsh.bdf"
     results_file = "test/unit_tests/true_results/permeameter1.h5" 
     cellgridid = Matrix{Int}(undef, 0, 3)

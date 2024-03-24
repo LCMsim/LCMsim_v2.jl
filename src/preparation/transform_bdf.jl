@@ -31,22 +31,24 @@ function parse_HyperMeshNastran(inputfile::String)
 
     for line in lines
         if set_parsing_active
-            if isnothing(match(Regex("HMSET"), line))
+            if isdigit(last(strip(line)))
                 push!(temp_set, line)
-            else
-                part_id = parse(Int, match(Regex("[0-9]+\\s="), temp_set[1]).match[1:end-1]) + 1
+                part_id = parse(Int, match(Regex("[0-9]+\\s="), temp_set[1]).match[1:end-1]) + 1  #COb: Why is there a +1 ? Because base is 1 ?
+                                                                                                  #Consecutive numbering in parts file required?
                 ids = []
-
+           
                 for l in temp_set
                     ids_string = match(Regex("([0-9]+,)+[0-9]+"), l).match
                     append!(ids, split(ids_string, ","))
                 end
-
+           
                 ids = [parse(Int, id) for id in ids]
-
+           
                 push!(sets, (part_id, ids))
                 temp_set = []
                 set_parsing_active = false
+            else
+                push!(temp_set, line)
             end
         elseif !isnothing(match(Regex("GRID\\s*[0-9]+"), line))
             id = parse(Int, match(Regex("\\s[0-9]+\\s"), line).match)
