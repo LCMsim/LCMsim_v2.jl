@@ -47,7 +47,7 @@ include("../../src/LCMsim_v2.jl")
         test_cellgridid, test_vertices, test_pids, test_N = LCMsim_v2.__parse_HyperMesh(HyperMesh_file)
 
         # test expression
-        all(test_cellgridid .== cellgridid) && all(isapprox.(test_vertices, vertices, atol=1e-3)) && test_N == N
+        all(test_cellgridid .== cellgridid) && all(isapprox.(test_vertices, vertices, atol=0.)) && test_N == N
     end
 
     # Gmsh format
@@ -55,7 +55,7 @@ include("../../src/LCMsim_v2.jl")
         test_cellgridid, test_vertices, test_pids, test_N = LCMsim_v2.__parse_gmsh(Gmsh_file)
     
         # test expression
-        all(test_cellgridid .== cellgridid) && all(isapprox.(test_vertices, vertices, atol=1e-3)) && test_N == N
+        all(test_cellgridid .== cellgridid) && all(isapprox.(test_vertices, vertices, atol=1e-5)) && test_N == N
     end
 
     # inp format / PrePoMax/ Abaqus
@@ -64,6 +64,6 @@ include("../../src/LCMsim_v2.jl")
 
     
         # test expression
-        all(test_cellgridid .== cellgridid2) && all(isapprox.(test_vertices, vertices2, atol=1e-3)) && test_N == N2
+        all(test_cellgridid .== cellgridid2) && all(isapprox.(test_vertices, vertices2, atol=0.)) && test_N == N2
     end
 end

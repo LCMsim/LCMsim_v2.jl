@@ -1,5 +1,6 @@
 using Test
 using HDF5
+using GeometryBasics
 include("../../src/LCMsim_v2.jl")
 
 eps = 1e-20
@@ -83,7 +84,7 @@ eps = 1e-20
         max = 0.
         ind = 0
         for i in 1:N
-            test_volume = LCMsim_v2.__calculate_cellvolume(i, thickness[i], cellgridid, vertices)
+            test_area, test_volume = LCMsim_v2.__calculate_area_and_volume(i, thickness[i], cellgridid, vertices)
             pass = pass && abs(test_volume - volume[i]) < eps
             if max < abs(test_volume - volume[i])
                 max = test_volume - volume[i]
@@ -116,6 +117,7 @@ eps = 1e-20
                     0.,
                     0.,
                     0.,
+                    0.,
                     Point3{Float64}([0., 0., 0.])
                 )
 
@@ -135,7 +137,8 @@ eps = 1e-20
                     0.,
                     0.,
                     0.,
-                    Point3{Float64}([0., 0., 0.])
+                    0.,
+                    Point3{Float64}([0., 0., 0.]),
                 )
                 
                 test_face_area = LCMsim_v2.__calculate_face_area(
@@ -164,8 +167,26 @@ eps = 1e-20
         temp_Tmat = Vector{Matrix{Float64}}(undef, N)
         local_verts = Vector{Vector{Point3{Float64}}}(undef, N)
         for cid in 1:N
-            i1, i2, i3 = cellgridid[cid, :]
-            _theta, _Tmat, _local_verts = LCMsim_v2.__calculate_local_coordinates(vertices[i1], vertices[i2], vertices[i3], centers[cid], Point3{Float64}([1., 0., 0.]))
+            cell = LCMsim_v2.LcmCell(
+                    cid, 
+                    (cellgridid[cid, 1] , cellgridid[cid, 2], cellgridid[cid, 3]),
+                    vertices[cellgridid[cid, :]],
+                    centers[cid],
+                    0,
+                    1,
+                    [0],
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    Point3{Float64}([1., 0., 0.])
+                )
+
+            _theta, _Tmat, _local_verts = LCMsim_v2.__calculate_local_coordinates(cell)
             theta[cid] = _theta
             temp_Tmat[cid] = _Tmat
             local_verts[cid] = _local_verts
@@ -173,17 +194,52 @@ eps = 1e-20
 
         for cid in 1:N
             for (i, neighbour) in enumerate(neighbours[cid])
+                cell = LCMsim_v2.LcmCell(
+                    cid, 
+                    (cellgridid[cid, 1] , cellgridid[cid, 2], cellgridid[cid, 3]),
+                    vertices[cellgridid[cid, :]],
+                    centers[cid],
+                    0,
+                    1,
+                    [0],
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    Point3{Float64}([1., 0., 0.])
+                )
+
+                neighbour_cell = LCMsim_v2.LcmCell(
+                    neighbour, 
+                    (cellgridid[neighbour, 1] , cellgridid[neighbour, 2], cellgridid[neighbour, 3]),
+                    vertices[cellgridid[neighbour, :]],
+                    centers[neighbour],
+                    0,
+                    1,
+                    [0],
+                    thickness[neighbour],
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    0.,
+                    Point3{Float64}([1., 0., 0.]),
+                )
 
                 (  
                     test_face_normal, 
                     test_center_to_center, 
                     transformation
                 ) = LCMsim_v2.__calculate_transformation(
-                    cellgridid[cid, :], 
-                    cellgridid[neighbour, :], 
+                    cell,
+                    neighbour_cell, 
                     local_verts[cid], 
-                    centers[cid], 
-                    centers[neighbour], 
                     theta[neighbour], 
                     temp_Tmat[cid], 
                     vertices
