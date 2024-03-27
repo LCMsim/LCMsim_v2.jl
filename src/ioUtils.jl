@@ -235,3 +235,130 @@ function log_license()
     Submit bug reports to christof.obertscheider@fhwn.ac.at
     """
 end
+
+# function to load data from hdf5 file and create LcmMesh object
+function load_original_mesh(filename::String)::LcmMesh
+    # open hdf5 file
+    h5open(filename, "r") do fid
+        # read mesh group
+        mesh = fid["/mesh"]
+        # read vertices
+        vertices = read_dataset(mesh["nodes"], "grid")
+        # read cells
+        cellgridid = read_dataset(mesh["cells"], "cellgridid")
+
+        cellcenters = read_dataset(mesh["aux"], "cellcenters")
+        cellvolume = read_dataset(mesh["aux"], "cellvolume")
+        celltype = read_dataset(mesh["aux"], "celltype")
+        cellalpha = read_dataset(mesh["aux"], "cellalpha")
+        cellneighboursarray = read_dataset(mesh["aux"], "cellneighboursarray")
+        cellfacearea = read_dataset(mesh["aux"], "cellfacearea")
+        cellfacenormal = read_dataset(mesh["aux"], "cellfacenormal")
+        cellcentertocellcenter = read_dataset(mesh["aux"], "cellcentertocellcenter")
+        T11 = read_dataset(mesh["aux"], "T11")
+        T12 = read_dataset(mesh["aux"], "T12")
+        T21 = read_dataset(mesh["aux"], "T21")
+        T22 = read_dataset(mesh["aux"], "T22")
+
+        cellthickness = read_dataset(mesh["parameters"], "cellthickness")
+        cellpermeability = read_dataset(mesh["parameters"], "cellpermeability")
+        cellporosity = read_dataset(mesh["parameters"], "cellporosity")
+        permeability_ratio = read_attribute(mesh["parameters"], "permeability_ratio")
+
+        # convert vertices to Vector{Point3{Float64}}
+        vertices = [Point3{Float64}(vertices[i, 1], vertices[i, 2], vertices[i, 3]) for i in 1:size(vertices, 1)]
+
+        textile_cell_ids = []
+        inlet_cell_ids = []
+        outlet_cell_ids = []
+
+        # create mesh object
+        N = size(cellgridid, 1)
+        cells = Vector{LcmCell}(undef, N)
+        for i in 1:N
+            if celltype[i] == 1
+                type = inner::CELLTYPE
+                push!(textile_cell_ids, i)
+            elseif celltype[i] == -3
+                type = wall::CELLTYPE
+                push!(textile_cell_ids, i)
+            elseif celltype[i] == -1
+                type = inlet::CELLTYPE
+                push!(inlet_cell_ids, i)
+            elseif celltype[i] == -2
+                type = outlet::CELLTYPE
+                push!(outlet_cell_ids, i)
+            end
+
+            neighbours = cellneighboursarray[i, :]
+            # get number of neighbours, entries in array are -9 if no neighbour
+            num_neighbours = count(x -> x != -9, neighbours)
+            # get neighbour ids
+            neighbour_ids = [neighbours[j] for j in 1:num_neighbours]
+
+            # create tuple from vector of vertex ids for cell
+            vertex_ids = Tuple{Int, Int, Int}(cellgridid[i, :])
+
+            area = 0.
+            part_id = 0
+            ap = 0. # not suitable for i_model = 3
+            cp = 0. # not suitable for i_model = 3
+            ref_dir = Point3{Float64}([0., 0., 0.]) # not used in simulation
+
+            cells[i] = LcmCell(
+                i,
+                vertex_ids,
+                vertices[cellgridid[i, :]],
+                Point3{Float64}(cellcenters[i, :]),
+                part_id,
+                num_neighbours,
+                neighbour_ids,
+                cellthickness[i],
+                area,
+                cellvolume[i],
+                cellpermeability[i],
+                cellporosity[i],
+                ap,
+                cp,
+                cellalpha[i],
+                ref_dir,
+                type
+            )
+
+            for j in 1:num_neighbours
+                neighbour_id = neighbours[j]
+                # cellcentertocellcenter[i, j] as Point2{Float64}
+                cellcentertocellcenter_ = Point2{Float64}(cellcentertocellcenter[i, j, 1], cellcentertocellcenter[i, j, 2])
+                # cellfacenormal[i, j] as Point2{Float64}
+                cellfacenormal_ = Point2{Float64}(cellfacenormal[i, j, 1], cellfacenormal[i, j, 2])
+                # transformation matrix
+                transformation = Matrix{Float64}(
+                    [T11[i, j] T12[i, j];
+                    T21[i, j] T22[i, j]]
+                )
+                
+                # create NeighbouringCell object
+                cells[i].neighbours[j] = NeighbouringCell(
+                    neighbour_id,
+                    cellfacearea[i, j],
+                    cellfacenormal_,
+                    cellcentertocellcenter_,
+                    transformation
+                )
+            end
+        end
+
+        # create mesh object
+        mesh = LcmMesh(
+            N,
+            vertices,
+            cells,
+            textile_cell_ids,
+            inlet_cell_ids,
+            outlet_cell_ids,
+            [],
+            permeability_ratio
+        )   
+        return mesh
+    end
+end

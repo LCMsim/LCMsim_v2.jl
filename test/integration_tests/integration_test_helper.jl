@@ -11,7 +11,8 @@ function integration_test(
     i_model::Int,
     true_results::String,
     test_frequency::Int,
-    fixed_deltat::Float64
+    fixed_deltat::Float64,
+    mesh = nothing
 )::Bool
 
     if i_model == 1
@@ -22,21 +23,39 @@ function integration_test(
         modeltype = LCMsim_v2.model_3
     end
 
-    case = LCMsim_v2.create(meshfile, partfile, simfile, modeltype)
+    case = nothing
+    if isnothing(mesh)
+        case = LCMsim_v2.create(meshfile, partfile, simfile, modeltype)
+    else
+        model = LCMsim_v2.create_SimParameters(mesh, simfile, modeltype) 
+        state = LCMsim_v2.create_initial_state(mesh, model)
+
+        case = LCMsim_v2.LcmCase(
+            mesh,
+            model,
+            state
+        )
+    end
 
     # test volume
     test_volume = Vector{Float64}(undef, case.mesh.N)
+    test_permeability = Vector{Float64}(undef, case.mesh.N)
     for i in 1:case.mesh.N
         test_volume[i] = case.mesh.cells[i].volume
+        test_permeability[i] = case.mesh.cells[i].permeability
     end
 
     h5open(true_results, "r") do fid
         true_volume = read_dataset(fid["/mesh/aux"], "cellvolume")
         volume_diff, volume_ind = findmax(abs.(true_volume .- test_volume))
         @info "Maximum volume difference (" * string(volume_ind) * ", " * string(volume_diff) * ")" 
+
+        true_permeability = read_dataset(fid["/mesh/parameters"], "cellpermeability")
+        permeability_diff, permeability_ind = findmax(abs.(true_permeability .- test_permeability))
+        @info "Maximum permeability difference (" * string(permeability_ind) * ", " * string(permeability_diff) * ")" 
     end
-    # LCMSim_v2.save_plottable_mesh(mesh, "test.h5")
-    # LCMSim_v2.save_state(state, "test.h5")
+    LCMsim_v2.save_plottable_mesh(case.mesh, "test.h5")
+    LCMsim_v2.save_state(case.state, "test.h5")
 
     test = false
     h5open(true_results, "r") do fid
@@ -69,7 +88,7 @@ end
 function compare_state(
     test_state::LCMsim_v2.State,
     true_states::HDF5.Group,
-    eps=1e-5
+    eps=1e-9
 )
 
     state_string = @sprintf("state%09i", test_state.iter)   
