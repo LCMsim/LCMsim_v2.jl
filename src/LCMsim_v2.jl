@@ -778,27 +778,6 @@ function solve(
             gamma_old[cell.id] = gamma_new[cell.id] + 0.0
         end
 
-        # boundary conditions, only for pressure boundary conditions
-        # TODO implement possible viscosity boundary conditions
-        # TODO change to reset to old value, important for custom actions
-        p_new[mesh.inlet_cell_ids] .= model.p_a
-        u_new[mesh.inlet_cell_ids] .= U_A
-        v_new[mesh.inlet_cell_ids] .= V_A
-        rho_new[mesh.inlet_cell_ids] .= model.rho_a
-        gamma_new[mesh.inlet_cell_ids] .= GAMMA_A
-        p_new[mesh.outlet_cell_ids] .= model.p_init
-        u_new[mesh.outlet_cell_ids] .= U_INIT
-        v_new[mesh.outlet_cell_ids] .= V_INIT
-        rho_new[mesh.outlet_cell_ids] .= model.rho_init
-        gamma_new[mesh.outlet_cell_ids] .= GAMMA_INIT
-
-        # prepare arrays for next time step
-        u_old .= u_new
-        v_old .= v_new
-        rho_old .= rho_new
-        p_old .= p_new
-        gamma_old .= gamma_new
-
         if verbosity == verbose::Verbosity
             percent = round(Int, 100 * (t - old_state.t) / (t_next - old_state.t))
             if percent < 100
