@@ -90,6 +90,8 @@ function save_plottable_mesh(mesh::LcmMesh, filename::String)::Nothing
         permeability = Vector{Float64}(undef, mesh.N)
         porosity = Vector{Float64}(undef, mesh.N)
         volume = Vector{Float64}(undef, mesh.N)
+        alpha = Vector{Float64}(undef, mesh.N)
+        reference_direction = Matrix{Float64}(undef, mesh.N, 3)
 
         for (cid, cell) in enumerate(mesh.cells)  
             cells[cid, :] .= cell.vertex_ids
@@ -99,6 +101,8 @@ function save_plottable_mesh(mesh::LcmMesh, filename::String)::Nothing
             permeability[cid] = cell.permeability
             porosity[cid] = cell.porosity
             volume[cid] = cell.volume
+            alpha[cid] = cell.alpha
+            reference_direction[cid, :] = cell.reference_direction
         end
 
         M = length(mesh.vertices)

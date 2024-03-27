@@ -804,7 +804,7 @@ function solve(
         end
 
         if verbosity == verbose::Verbosity
-            percent = round(Int, 100 * t / t_next)
+            percent = round(Int, 100 * (t-old_state.t) / (t_next-old_state.t) )
             if percent < 100
                 ProgressMeter.update!(progress, percent)
             end
