@@ -769,6 +769,13 @@ function solve(
                 model,
                 scaled_properties
             )
+
+            # update old state of this cell
+            u_old[cell.id] = u_new[cell.id] + 0.0
+            v_old[cell.id] = v_new[cell.id] + 0.0
+            rho_old[cell.id] = rho_new[cell.id] + 0.0
+            p_old[cell.id] = p_new[cell.id] + 0.0
+            gamma_old[cell.id] = gamma_new[cell.id] + 0.0
         end
 
         # boundary conditions, only for pressure boundary conditions
@@ -792,6 +799,13 @@ function solve(
         p_old .= p_new
         gamma_old .= gamma_new
 
+        if verbosity == verbose::Verbosity
+            percent = round(Int, 100 * (t - old_state.t) / (t_next - old_state.t))
+            if percent < 100
+                ProgressMeter.update!(progress, percent)
+            end
+        end
+
         # Δt calculation
         if isnothing(fixed_deltat)
             Δt = adaptive_timestep(
@@ -801,13 +815,6 @@ function solve(
                 v_new,
                 Δt
             )
-        end
-
-        if verbosity == verbose::Verbosity
-            percent = round(Int, 100 * (t-old_state.t) / (t_next-old_state.t) )
-            if percent < 100
-                ProgressMeter.update!(progress, percent)
-            end
         end
         
         iter = iter + 1

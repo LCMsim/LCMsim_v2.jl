@@ -531,101 +531,55 @@ function parse_partfile(partfilename::String, allowed_part_ids::Vector{Int})
 
     # SOME ASSERTIONS
     column_names = ["name", "type", "part_id", "thickness", "porosity", "porosity_noise", "permeability", "permeability_noise", "alpha", "refdir1", "refdir2", "refdir3", "porosity_1", "p_1"]
-    @assert issetequal(String.(partfile.names), column_names) "Invalid column name in part description file!"
+    @assert issetequal(String.(partfile.names), column_names) "Invalid column name in part file!"
 
     # get parts / ids from partfile
-    pids_partfile = partfile["part_id"]
+    pids_part = Int8.(partfile["part_id"])
+
+    # assert that every part id in the partfile is also in the meshfile
+    @assert all(map(x -> x in allowed_part_ids, pids_part)) "Invalid part id in part file!"
 
     # check validity of part description file (correct number and valid types)
-    @assert all([pid in allowed_part_ids for pid in pids_partfile]) "A part id has been provided in the part description file that does not exist in the mesh file."
     @assert all([!all(map(!isequal(String(type)), ["base", "inlet", "outlet", "patch"])) for type in unique(partfile["type"])]) "Invalid type entry in part description file!"
 
-    # check for base part
+
     parts = Dict{Int, Dict}()
-    base_row = findall(x -> x == "base" ,partfile["type"])
-    @assert length(base_row) == 1 "Exactly one part of type \"base\" is needed!"
-    base_row = only(base_row)
-
-    # extract base parameters
-    pid = partfile["part_id"][base_row]
-    # get group for this part
-
-    refdir = [partfile["refdir1"][base_row] partfile["refdir2"][base_row] partfile["refdir3"][base_row]]
-
-    # nomalize refdir vector
-    refdir = refdir / sqrt(dot(refdir, refdir))
-    refdir = Point3{Float64}(refdir[:])
-
-    base_parameters = Dict(
-        KEY_PART_ID => pid,
-        KEY_REFERENCE_DIRECTION => refdir,
-        KEY_ALPHA => Float64(partfile["alpha"][base_row]),
-        KEY_PERMEABILITY => partfile["permeability"][base_row],
-        KEY_PERMEABILITY_NOISE => partfile["permeability_noise"][base_row],
-        KEY_POROSITY => partfile["porosity"][base_row],
-        KEY_POROSITY_NOISE => partfile["porosity_noise"][base_row],
-        KEY_THICKNESS => partfile["thickness"][base_row],
-        KEY_TYPE => inner::CELLTYPE,
-        KEY_POROSITY_1 => partfile["porosity_1"][base_row],
-        KEY_P_1 => partfile["p_1"][base_row],
-        KEY_NAME => partfile["name"][base_row]
-    )
-
+    base_parameters = nothing
     for row in 1:partfile.rows
         pid = partfile["part_id"][row]
         # get group for this part
 
+        refdir = [partfile["refdir1"][row] partfile["refdir2"][row] partfile["refdir3"][row]]
+
+        # nomalize refdir vector # TODO don't like this kind of calculation here, separate
+        refdir = refdir / sqrt(dot(refdir, refdir))
+        refdir = Point3{Float64}(refdir[:])
+
+        # TODO not happy with this logic here
         typestring = partfile["type"][row]
-        # inlets get the same parameters as base, but other type
+        type = inner::CELLTYPE
         if typestring == "inlet"
-            part_parameters = deepcopy(base_parameters)
-            part_parameters[KEY_PART_ID] = pid
-            part_parameters[KEY_NAME] = partfile["name"][row]
-            part_parameters[KEY_TYPE] = inlet::CELLTYPE
-        # outlets get the same parameters as base, but other type
+            type = inlet::CELLTYPE
         elseif typestring == "outlet"
-            part_parameters = deepcopy(base_parameters)
-            part_parameters[KEY_PART_ID] = pid
-            part_parameters[KEY_NAME] = partfile["name"][row]
-            part_parameters[KEY_TYPE] = outlet::CELLTYPE
-        elseif typestring == "base"
-            part_parameters = base_parameters
-        # patches hae their own set of parameters
-        elseif typestring == "patch"
-            refdir = [partfile["refdir1"][row] partfile["refdir2"][row] partfile["refdir3"][row]]
-
-            # nomalize refdir vector
-            refdir = refdir / sqrt(dot(refdir, refdir))
-            refdir = Point3{Float64}(refdir[:])
-
-            part_parameters = Dict(
-                KEY_PART_ID => pid,
-                KEY_REFERENCE_DIRECTION => refdir,
-                KEY_ALPHA => Float64(partfile["alpha"][row]),
-                KEY_PERMEABILITY => partfile["permeability"][row],
-                KEY_PERMEABILITY_NOISE => partfile["permeability_noise"][row],
-                KEY_POROSITY => partfile["porosity"][row],
-                KEY_POROSITY_NOISE => partfile["porosity_noise"][row],
-                KEY_THICKNESS => partfile["thickness"][row],
-                KEY_TYPE => inner::CELLTYPE,
-                KEY_POROSITY_1 => partfile["porosity_1"][row],
-                KEY_P_1 => partfile["p_1"][row],
-                KEY_NAME => partfile["name"][row]
-            )
+            type = outlet::CELLTYPE
         end
+
+        part_parameters = Dict(
+            KEY_PART_ID => pid,
+            KEY_REFERENCE_DIRECTION => refdir,
+            KEY_ALPHA => Float64(partfile["alpha"][row]),
+            KEY_PERMEABILITY => partfile["permeability"][row],
+            KEY_PERMEABILITY_NOISE => partfile["permeability_noise"][row],
+            KEY_POROSITY => partfile["porosity"][row],
+            KEY_POROSITY_NOISE => partfile["porosity_noise"][row],
+            KEY_THICKNESS => partfile["thickness"][row],
+            KEY_TYPE => type,
+            KEY_POROSITY_1 => partfile["porosity_1"][row],
+            KEY_P_1 => partfile["p_1"][row],
+            KEY_NAME => partfile["name"][row]
+        )
         parts[pid] = part_parameters
     end
-
-    # create entries for pids that are not described in partfile
-    # give them base parameters
-    for pid in setdiff(allowed_part_ids, pids_partfile)
-        part_parameters = deepcopy(base_parameters)
-        part_parameters[KEY_PART_ID] = pid
-        part_parameters[KEY_NAME] = "unused_" * string(pid)
-        part_parameters[KEY_TYPE] = inner::CELLTYPE
-        parts[pid] = part_parameters
-    end
-
     return parts
 end
 
