@@ -124,6 +124,8 @@ function save_plottable_mesh(mesh::LcmMesh, filename::String)::Nothing
             write_dataset(props, "thickness", thickness)
             write_dataset(props, "type", type)
             write_dataset(props, "part_id", part_id)
+            write_dataset(props, "alpha", alpha)
+            write_dataset(props, "reference_direction", reference_direction)
         end
 end
 
