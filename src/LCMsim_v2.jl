@@ -20,6 +20,7 @@ include("models/model_3.jl")
 
 export create, 
 create_and_solve,
+continue_and_solve,
 Verbosity, 
 apply_pressure,
 solve, 
@@ -181,6 +182,116 @@ function create_and_solve(
     end
 
     t_next = 0.0
+    while t_next < t_max
+        t_next += t_step
+        state = solve(case.model, case.mesh, state, t_next, verbosity)
+
+        if save_hdf
+            # append state to previously created hdf file
+            save_state(state, hdf_path)
+        end
+    end
+
+    # save end_case as jld2
+    end_case = LcmCase(
+        case.mesh,
+        case.model,
+        state
+    )
+    if save_binary
+        save_case(end_case, jld2_path)
+    end
+end
+
+
+"""
+    continue_and_solve(
+	    source_path::String,
+        save_path::String,
+        meshfile::String,
+        partfile::String,
+        simfile::String,
+        i_model::ModelType,
+        t_max::Float64,
+        output_intervals::Int,
+        verbosity=verbose::Verbosity,
+        save_binary::Bool=true,
+        save_hdf::Bool=true
+    )::Nothing
+
+    This function allows to continue a simulation. 
+	A new LcmCase is created but the initial values are from the a saved LcmCase
+    Creates a mesh, a model and an initial state from the given files.
+    The model is chosen according to the given i_model.
+    Then solves the problem up to the specified end time.
+    Saves results in hdf5 format at the specified output intervals.
+    If t_step is not given, it is set to t_max, aka the results are only saved at the end.
+    Additionally saves the resulting LcmCase as binary in jld2 format.
+"""
+
+function continue_and_solve(
+    source_path::String,
+	save_path::String,
+    meshfile::String,
+    partfile::String,
+    simfile::String,
+    i_model::ModelType,
+    t_max::Float64,
+    output_intervals=Int(4),
+    verbosity=verbose::Verbosity,
+    save_binary::Bool=true,
+    save_hdf::Bool=true  
+)::Nothing
+
+    case_old = load_case(source_path)
+    # retrieve old state
+    state_old = case_old.state
+
+    # check if path exists and get paths to data.h5 and data.jld2
+    hdf_path, jld2_path = check_path(save_path)
+
+    # create and save case
+    case = create(
+        meshfile,
+        partfile,
+        simfile,
+        i_model,
+        save_path
+    )
+    # retrieve initial state
+    state = case.state
+
+    # write relevant old values into new state
+    state=State(
+        state_old.t,
+        state_old.iter,
+        state_old.deltat,
+        state_old.p,
+        state_old.gamma,
+        state_old.rho,
+        state_old.u,
+        state_old.v,
+        state.viscosity,
+        state.porosity_times_porosity
+    )
+
+    if save_hdf
+        save_plottable_mesh(case.mesh, hdf_path)
+    end
+
+    # if t_step is not given, set it to t_max
+    if output_intervals > 0
+        t_step = (ceil(t_max)-floor(state_old.t))/output_intervals
+    else
+        t_step=t_max
+    end
+
+    if verbosity == verbose::Verbosity
+        log_license()
+        # TODO log simulation parameters
+    end
+
+    t_next = state_old.t+0.0
     while t_next < t_max
         t_next += t_step
         state = solve(case.model, case.mesh, state, t_next, verbosity)
@@ -777,6 +888,20 @@ function solve(
             p_old[cell.id] = p_new[cell.id] + 0.0
             gamma_old[cell.id] = gamma_new[cell.id] + 0.0
         end
+
+        #COb: The following section was lost
+        #boundary conditions, only for pressure boundary conditions
+        # TODO implement possible viscosity boundary conditions
+        p_new[mesh.inlet_cell_ids] .= model.p_a
+        u_new[mesh.inlet_cell_ids] .= U_A
+        v_new[mesh.inlet_cell_ids] .= V_A
+        rho_new[mesh.inlet_cell_ids] .= model.rho_a
+        gamma_new[mesh.inlet_cell_ids] .= GAMMA_A
+        p_new[mesh.outlet_cell_ids] .= model.p_init
+        u_new[mesh.outlet_cell_ids] .= U_INIT
+        v_new[mesh.outlet_cell_ids] .= V_INIT
+        rho_new[mesh.outlet_cell_ids] .= model.rho_init
+        gamma_new[mesh.outlet_cell_ids] .= GAMMA_INIT
 
         if verbosity == verbose::Verbosity
             percent = round(Int, 100 * (t - old_state.t) / (t_next - old_state.t))
