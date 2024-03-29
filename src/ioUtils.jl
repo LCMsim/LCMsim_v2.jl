@@ -196,7 +196,7 @@ end
 """
 function load_case(path::String)::LcmCase
     # assert that path exists
-    @assert isfile(path), "The given path does not exist."
+    @assert isfile(path) "The given path does not exist."  #COb: path already includes the filename
 
     # load the jld2 file
     jld2file = JLD2.load(path)
@@ -211,11 +211,14 @@ end
     Saves a LcmCase object to a jld2 file.
 """
 function save_case(case::LcmCase, path::String)::Nothing
-    # assert that path exists
-    @assert isdir(path) "The given path does not exist."
+    ## assert that path exists
+    #@assert isdir(path) "The given path does not exist."  
+    ## save the LcmCase object
+    #JLD2.save(path * "/data.jld2", "LcmCase", case)
 
-    # save the LcmCase object
-    JLD2.save(path * "/data.jld2", "LcmCase", case)
+    #COb: path already includes the filename
+    @assert isfile(path) "The given path does not exist." 
+    JLD2.save(path, "LcmCase", case)
 end
 
 # funtion to log license and version
