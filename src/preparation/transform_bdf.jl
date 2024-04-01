@@ -146,7 +146,6 @@ function parse_HyperMeshNastran(inputfile::String)
         end
         ids=unique(ids)
         push!(sets, (part_id, ids))
-        rm(_psetfile)
     end
     
 
