@@ -128,134 +128,247 @@ function __parse_HyperMesh(filename::String)
 end
 
 function __parse_abaqus(filename::String)
-        # Abaqus format: Node block after *Node, Element block after *Element, TYPE=S3, Element sets after *ELSET
-        # Only one block with nodes and one block with face elements. Mulitple (<=4) element sets possible.
+    grid = Dict()
+    ctria = Dict()
+    sets = []
+    temp_set = []
+    set_parsing_active = false
+	element_parsing_active = false
+	node_parsing_active = false
+    dummy_part_id = 1
+	ind=Int(1);
+	gridind = Int(1);
+	nodeind = Int(1);
+	elementind = Int(1);
+	setelementind = Int(1);
+	setind = Int(0);
+	pids = Vector{Int}(undef, 0)
+    origgridid=[];
+    gridx=[];
+    gridy=[];
+    gridz=[];
+    celloriggridid=[];
+    cellgridid=Array{Int64}(undef, 0, 3);
 
-        ind=Int64(1);
-        gridind=Int64(1);
-        nodeind=Int64(1);
-        elementind=Int64(1);
-        setelementind=Int64(1);
-        setind=Int64(0);
-        isnodedefinition=Int64(0);
-        iselementdefinition=Int64(0);
-        issetdefinition=Int64(0);
-        origgridid=[];
-        gridx=[];
-        gridy=[];
-        gridz=[];
-        celloriggridid=[];
-        cellgridid=Array{Int64}(undef, 0, 3);
+    #COb: Read not used sets from file "_filename.inp"
+    notusedsets = Vector{Int}(undef, 0)
+    inputfile_parts=splitpath(filename)
+    inputfile_parts[end]="_" * inputfile_parts[end]
+    _inputfile=joinpath(inputfile_parts)
+    if isfile(_inputfile) 
+        lines = readlines(_inputfile)
+        ids = [parse(Int, id) for id in split(lines[1],",")]
+        for id in ids
+            push!(notusedsets, id)
+        end
+    end
 
-        pids = Vector{Int}(undef, 0)
-        
-        open(filename, "r") do fid
-            line=1;
-            while !eof(fid)            
-                thisline=readline(fid)
-                thisline=replace(thisline," "=> "");
+    lines = readlines(filename)
 
-                len_line=length(thisline)
+    #COb: Modified to assign set numbers in increasing order of reading from mesh file, starting from 2
+    i_set=2
+    for line in lines
+	    thisline=replace(line," "=> "");
+		len_line=length(thisline)
 
-                if isnodedefinition==1
-                    if isempty(thisline)==1 || cmp(thisline[1:1],"*")==0
-                        isnodedefinition=Int64(0)
-                    else
-                        txt_vec=split(thisline,",")
-                        gridindstring=txt_vec[1]
-                        origgridid=vcat(origgridid,parse(Int64,gridindstring));                        
-                        txt=txt_vec[2]
-                        txt=replace(txt," "=> "");txt=replace(txt,"E" => "");txt=replace(txt,"e" => "");
-                        txt1=replace(txt,"-" => "e-");txt1=replace(txt1,"+" => "e+");
-                        if cmp(txt1[1],'e')==0;txt2=txt1[2:end];else;txt2=txt1;end;
-                        val=parse(Float64,txt2);
-                        val1=val;
-                        txt=txt_vec[3]
-                        txt=replace(txt," "=> "");txt=replace(txt,"E" => "");txt=replace(txt,"e" => "");
-                        txt1=replace(txt,"-" => "e-");txt1=replace(txt1,"+" => "e+");
-                        if cmp(txt1[1],'e')==0;txt2=txt1[2:end];else;txt2=txt1;end;
-                        val=parse(Float64,txt2);
-                        val2=val;
-                        txt=txt_vec[4]
-                        txt=replace(txt," "=> "");txt=replace(txt,"E" => "");txt=replace(txt,"e" => "");
-                        txt1=replace(txt,"-" => "e-");txt1=replace(txt1,"+" => "e+");
-                        if cmp(txt1[1],'e')==0;txt2=txt1[2:end];else;txt2=txt1;end;
-                        val=parse(Float64,txt2);
-                        val3=val;
-                        gridx=vcat(gridx,Float64(val1));
-                        gridy=vcat(gridy,Float64(val2));
-                        gridz=vcat(gridz,Float64(val3));
-                        gridind=gridind+1;
-                    end
+		if node_parsing_active
+			if isempty(thisline)==1 || cmp(thisline[1:1],"*")==0
+				node_parsing_active=false
+			else
+				txt_vec=split(thisline,",")
+				gridindstring=txt_vec[1]
+				origgridid=vcat(origgridid,parse(Int64,gridindstring));                        
+				txt=txt_vec[2]
+				txt=replace(txt," "=> "");txt=replace(txt,"E" => "");txt=replace(txt,"e" => "");
+				txt1=replace(txt,"-" => "e-");txt1=replace(txt1,"+" => "e+");
+				if cmp(txt1[1],'e')==0;txt2=txt1[2:end];else;txt2=txt1;end;
+				val=parse(Float64,txt2);
+				val1=val;
+				txt=txt_vec[3]
+				txt=replace(txt," "=> "");txt=replace(txt,"E" => "");txt=replace(txt,"e" => "");
+				txt1=replace(txt,"-" => "e-");txt1=replace(txt1,"+" => "e+");
+				if cmp(txt1[1],'e')==0;txt2=txt1[2:end];else;txt2=txt1;end;
+				val=parse(Float64,txt2);
+				val2=val;
+				txt=txt_vec[4]
+				txt=replace(txt," "=> "");txt=replace(txt,"E" => "");txt=replace(txt,"e" => "");
+				txt1=replace(txt,"-" => "e-");txt1=replace(txt1,"+" => "e+");
+				if cmp(txt1[1],'e')==0;txt2=txt1[2:end];else;txt2=txt1;end;
+				val=parse(Float64,txt2);
+				val3=val;
+				gridx=vcat(gridx,Float64(val1));
+				gridy=vcat(gridy,Float64(val2));
+				gridz=vcat(gridz,Float64(val3));
+				gridind=gridind+1;				
+	
+                id=parse(Int64,gridindstring)
+				pos = length(grid) + 1
+				grid[id] = (pos, [Float64(val1), Float64(val2), Float64(val3)])
+			end
+		end
+				
+		if element_parsing_active
+			if isempty(thisline) == 1 || cmp(thisline[1:1],"*") == 0
+				element_parsing_active=false
+			else
+				txt_vec=split(thisline,",")
+				celloriggridid=vcat(celloriggridid,parse(Int64,txt_vec[1]));
+				i1val=parse(Int64,txt_vec[2]);
+				i1=findfirst(isequal(i1val),origgridid);
+				i2val=parse(Int64,txt_vec[3]);
+				i2=findfirst(isequal(i2val),origgridid);
+				i3val=parse(Int64,txt_vec[4]);
+				i3=findfirst(isequal(i3val),origgridid);
+				ivec=[i1,i2,i3];
+				idel=findall(isequal(min(ivec[1],ivec[2],ivec[3])),ivec);
+				deleteat!(ivec,idel)
+				idel=findall(isequal(max(ivec[1],ivec[2])),ivec);
+				deleteat!(ivec,idel)                        
+				cellgridid=vcat(cellgridid,[min(i1,i2,i3) ivec[1] max(i1,i2,i3)]);
+				ind=ind+1;    
+
+                id=parse(Int64,txt_vec[1])
+				verts=[min(i1,i2,i3) ivec[1] max(i1,i2,i3)]			
+			    ctria[id] = (dummy_part_id, verts)	
+			end
+		end
+		
+		if set_parsing_active
+			if isempty(thisline)==1 || cmp(thisline[1:1],"*")==0
+				part_id = i_set
+				if (i_set in notusedsets)
+                    part_id = 1
                 end
+                i_set=i_set+1
+				
+				push!(sets, (part_id, pids))	
 
-                if iselementdefinition == 1 
-                    if isempty(thisline) == 1 || cmp(thisline[1:1],"*") == 0
-                        iselementdefinition=Int64(0)
-                    else
-                        txt_vec=split(thisline,",")
-                        celloriggridid=vcat(celloriggridid,parse(Int64,txt_vec[1]));
-                        i1val=parse(Int64,txt_vec[2]);
-                        i1=findfirst(isequal(i1val),origgridid);
-                        i2val=parse(Int64,txt_vec[3]);
-                        i2=findfirst(isequal(i2val),origgridid);
-                        i3val=parse(Int64,txt_vec[4]);
-                        i3=findfirst(isequal(i3val),origgridid);
-                        ivec=[i1,i2,i3];
-                        idel=findall(isequal(min(ivec[1],ivec[2],ivec[3])),ivec);
-                        deleteat!(ivec,idel)
-                        idel=findall(isequal(max(ivec[1],ivec[2])),ivec);
-                        deleteat!(ivec,idel)                        
-                        cellgridid=vcat(cellgridid,[min(i1,i2,i3) ivec[1] max(i1,i2,i3)]);
-                        ind=ind+1;    
-                    end
-                end
+				set_parsing_active=false
+			elseif isnothing(tryparse(Int64,thisline[1:1]))    #name instead of numbers
+				set_parsing_active=false
+				setind=setind-1
+			else
+				txt1=thisline
+				txt1=replace(txt1," "=> "")
+				txt2=split(txt1,",")
+				for i in 1:length(txt2)
+					if !isempty(txt2[i])
+						push!(pids, parse(Int64,txt2[i]))
+					end
+				end			
 
-                if issetdefinition == 1 
-                    if isempty(thisline)==1 || cmp(thisline[1:1],"*")==0
-                        issetdefinition=Int64(0)
-                    elseif isnothing(tryparse(Int64,thisline[1:1]))    #name instead of numbers
-                        issetdefinition=Int64(0)
-                        setind=setind-1
-                    else
-                        txt1=thisline
-                        txt1=replace(txt1," "=> "")
-                        txt2=split(txt1,",")
-                        for i in 1:length(txt2)
-                            if !isempty(txt2[i])
-                                push!(pids, parse(Int64,txt2[i]))
-                            end
+			end
+		end		
+		
+		
+		if len_line>=5 &&  (cmp( thisline[1:5],"*Node")==0 || cmp( thisline[1:5],"*NODE")==0 ) #if the first five characters are *Node: isnodedefinition=1; else: isnodedefinition=0
+			node_parsing_active=true  #isnodedefinition=Int64(1);
+			nodeind=1
+			gridind=1
+		end
+		if (len_line>=17 &&  (cmp(thisline[1:17],"*Element, TYPE=S3")==0 || cmp(thisline[1:17],"*Element, Type=S3")==0 || cmp(thisline[1:17],"*ELEMENT, TYPE=S3")==0 || cmp(thisline[1:17],"*ELEMENT, Type=S3")==0) ) ||
+			len_line>=16 &&  (cmp(thisline[1:16],"*Element,TYPE=S3")==0 || cmp(thisline[1:16],"*Element,Type=S3")==0 || cmp(thisline[1:16],"*ELEMENT,TYPE=S3")==0 || cmp(thisline[1:16],"*ELEMENT,Type=S3")==0)  #if the first 17 characters are *Element, TYPE=S3                    
+			element_parsing_active=true  #iselementdefinition=Int64(1);
+			ind=1
+			elementind=1
+		end
+		if len_line>=6 &&  (cmp( thisline[1:6],"*Elset")==0 || cmp( thisline[1:6],"*ELSET")==0)  #if the first six characters are *ELSET
+			set_parsing_active=true  #issetdefinition=Int64(1);
+			setelementind=1
+			setind=setind+1
+		end
+		
+		
+		
+    end
+
+    #COb: if _pset.csv is available in directory with meshfile
+    #     change part_ID to an inlet for all cells which lie inside a sphere with radius
+    filename_parts=splitpath(filename)
+    _psetfile=joinpath( joinpath(filename_parts[1:end-1]) ,"_pset.csv")
+    if isfile(_psetfile)
+        #read _psetfile: first line radius, following line inlet points
+        lines = readlines(_psetfile);n_lines=length(lines);r_p=parse(Float64,lines[1])
+        inletpos_xyz=Array{Float64}[]
+        for i_line in 2:n_lines; 
+            str=split(lines[i_line],",")
+            xpos=parse(Float64,str[1])
+            ypos=parse(Float64,str[2])
+            zpos=parse(Float64,str[3])
+            inletpos_xyz=push!(inletpos_xyz,[xpos ypos zpos])
+        end
+        part_id = 6
+        ids = []
+        for i_inlet in 1:length(inletpos_xyz)
+            #loop over all grids, check if inside sphere with radius r, find attached elements, add them to set with part_id=6
+            xyz_inlet=inletpos_xyz[i_inlet,:]
+            for vert in grid
+                gid = vert[1] 
+                xyz_grid=vert[2][2]
+                vec1=[inletpos_xyz[i_inlet][1]-xyz_grid[1], inletpos_xyz[i_inlet][2]-xyz_grid[2], inletpos_xyz[i_inlet][3]-xyz_grid[3] ]
+                if sqrt(dot(vec1,vec1))<=r_p;
+                    #@info "gid $gid in inlet $i_inlet"                    
+                    for (i, cell) in ctria
+                        verts = cell[2]
+                        id = i
+                        if gid in verts
+                            #@info "cid $id in inlet $i_inlet"
+                            append!(ids, id)
                         end
-                    end
+                    end                    
                 end
-
-                
-                if len_line>=5 &&  (cmp( thisline[1:5],"*Node")==0 || cmp( thisline[1:5],"*NODE")==0 ) #if the first five characters are *Node: isnodedefinition=1; else: isnodedefinition=0
-                    isnodedefinition=Int64(1);
-                    nodeind=1
-                    gridind=1
-                end
-                if (len_line>=17 &&  (cmp(thisline[1:17],"*Element, TYPE=S3")==0 || cmp(thisline[1:17],"*Element, Type=S3")==0 || cmp(thisline[1:17],"*ELEMENT, TYPE=S3")==0 || cmp(thisline[1:17],"*ELEMENT, Type=S3")==0) ) ||
-                    len_line>=16 &&  (cmp(thisline[1:16],"*Element,TYPE=S3")==0 || cmp(thisline[1:16],"*Element,Type=S3")==0 || cmp(thisline[1:16],"*ELEMENT,TYPE=S3")==0 || cmp(thisline[1:16],"*ELEMENT,Type=S3")==0)  #if the first 17 characters are *Element, TYPE=S3                    
-                    iselementdefinition=Int64(1);
-                    ind=1
-                    elementind=1
-                end
-                if len_line>=6 &&  (cmp( thisline[1:6],"*Elset")==0 || cmp( thisline[1:6],"*ELSET")==0)  #if the first six characters are *ELSET
-                    issetdefinition=Int64(1);
-                    setelementind=1
-                    setind=setind+1
-                end
-
-                line+=1
             end
         end
-        N=ind-1;  #total number of cells
+        ids=unique(ids)
+        push!(sets, (part_id, ids))
+    end
+    
+    #@info "ctria = " * string(ctria)
+    #@info "grid = " * string(grid)
+    #@info "sets = " * string(sets)
+    #error("11")
 
-        grid = [gridx gridy gridz]
-        vertices = [Point3{Float64}(grid[i, :]) for i in 1:size(grid)[1]]
-           
-        return cellgridid, vertices, pids, N
+    ctria_vec = Vector{Any}(nothing, length(ctria))
+    grid_vec = Vector{Any}(nothing, length(grid))
+    for (part_id, cells) in sets
+        for cid in cells
+            ctria[cid] = (part_id, ctria[cid][2])
+        end
+    end
+
+    # rename verts
+    for (i, cell) in enumerate(ctria)
+        cid = cell[1]
+        pid = cell[2][1]
+        verts = cell[2][2]
+        verts = [grid[gid][1] for gid in verts]
+        ctria_vec[cid] = [pid, verts...]
+    end
+
+
+    for vert in grid
+        gid = vert[2][1] # gid after renaming
+        grid_vec[gid] = vert[2][2]
+    end
+
+    pids = Vector{Int}(undef, 0)
+    cellgridid = Matrix{Int}(undef, 0, 3)
+    for i in 1:size(ctria_vec)[1]
+        push!(pids, ctria_vec[i][1])
+        cellgridid = vcat(cellgridid, transpose(sort(ctria_vec[i][2:4])))
+    end
+    grid = Vector{Point3{Float64}}(undef, 0)
+    for i in 1:size(grid_vec)[1]
+        push!(grid, Point3{Float64}(grid_vec[i]))
+    end
+
+    #@info "cellgridid = " * string(cellgridid)
+    #@info "grid = " * string(grid)
+    #@info "pids = " * string(pids)
+    #@info "N = " * string(size(cellgridid)[1])    
+    #error("22")
+
+    return cellgridid, grid, pids, size(cellgridid)[1]
 end
 
 function parse_mesh(meshfile::String)
