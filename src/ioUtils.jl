@@ -224,16 +224,22 @@ end
 # funtion to log license and version
 function log_license()
     @info """
-    LCMsim_v2 version 1.0
-    LCMsim_v2 is Julia code which simulates the mold filling in Liquid Composite Molding (LCM) 
+    LCMsim v2 
+    
+    LCMsim v2 is Julia code which simulates the mold filling in Liquid Composite Molding (LCM) 
     manufacturing process. 
-    Copyright (C) 2023 Christof Obertscheider / University of Applied Sciences Wiener Neustadt (FHWN)
+    
+    Contributiors:
+    - Christof Obertscheider (FHWN): Conceptual design
+    - Leo Heber (ISSE): Software engineering
+    - Ewald Fauster (MUL): Scientific advisor
 
-    This program is free software; you can redistribute it and/or modify it under the terms of the 
-    GNU General Public License as published by the Free Software Foundation; either version 2 of the 
-    License, or (at your option) any later version. This program is distributed in the hope that it 
-    will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
-    FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+    This program is freely available and open source, licensed under the GNU General Public 
+    License version 3 (GPL v3).
+    
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+    See the GNU General Public License for more details.
     
     You should have received a copy of the GNU General Public License along with this program. If not, 
     see http://www.gnu.org/licenses/. 
