@@ -90,6 +90,9 @@ function parse_HyperMeshNastran(inputfile::String)
 
             if isdigit(last(strip(line)))
                 part_id = i_set  #parse(Int, match(Regex("[0-9]+\\s="), temp_set[1]).match[1:end-1]) + 1 
+                if (i_set in notusedsets)
+                    part_id = 1
+                end
                 i_set=i_set+1
                 ids = []
             
