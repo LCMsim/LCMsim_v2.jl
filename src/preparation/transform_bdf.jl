@@ -139,9 +139,9 @@ function parse_HyperMeshNastran(inputfile::String)
                 end
                 vec1=[inletpos_xyz[i_inlet][1]-xvec, inletpos_xyz[i_inlet][2]-yvec, inletpos_xyz[i_inlet][3]-zvec ]
                 if sqrt(dot(vec1,vec1))<=r_p;     
-                    @info "xvec,yvec,zvec = $xvec,$yvec,$zvec"          
+                    #@info "xvec,yvec,zvec = $xvec,$yvec,$zvec"          
                     id = i
-                    @info "cid $id in inlet $i_inlet"
+                    #@info "cid $id in inlet $i_inlet"
                     append!(ids, id)
                 end
             end     
