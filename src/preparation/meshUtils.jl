@@ -1,7 +1,184 @@
 using CSV
+using HDF5
 using LinearAlgebra
 using GeometryBasics
 using StaticArraysCore
+
+function create_LcmMesh(file::HDF5.File)
+    cellgridid = read_dataset(file["/mesh"], "cells")
+    vertices = read_dataset(file["/mesh"], "vertices")
+
+    part_ids = read_dataset(file["/properties"], "part_ids")
+    type = read_dataset(file["/properties"], "type")
+    thickness = read_dataset(file["/properties"], "thickness")
+    porosity = read_dataset(file["/properties"], "porosity")
+    permeability = read_dataset(file["/properties"], "permeability")
+    alpha = read_dataset(file["/properties"], "alpha")
+    reference_direction = read_dataset(file["/properties"], "reference_direction")
+    volume = read_dataset(file["/properties"], "volume")
+    area = read_dataset(file["/properties"], "area")
+    ap = read_dataset(file["/properties"], "ap")
+    cp = read_dataset(file["/properties"], "cp")
+    unique_part_ids = read_dataset(file["/properties"], "unique_part_ids")
+    names = Dict()
+    for pid in unique_part_ids
+        name = read_attribute(file["/properties"], string(pid))
+        names[pid] = name
+    end
+
+    N = size(cellgridid)[1]
+
+    # create part_id -> cell_id vector for each part
+    partID = Dict()
+    for part in unique(part_ids)
+        partID[part] = Vector{Int32}()
+    end
+    for i in 1:N
+        part_id = part_ids[i]
+        push!(partID[part_id], Int32(i))
+    end
+
+    # calculate neighbours and centers
+    each_cells_neighbours = __get_neighbours(cellgridid)
+    centers = __calculate_cellcenters(cellgridid, vertices)
+
+    # loop to create all cells with basic information
+    cells = Vector{LcmCell}(undef, 0)
+    for cid in 1:N
+        # get geometry and neighbour information for this cell
+        vertex_ids = (cellgridid[cid, 1], cellgridid[cid, 2], cellgridid[cid, 3])
+        center = centers[cid]
+        neighbours = each_cells_neighbours[cid]
+        num_neighbours = Int(length(neighbours))
+
+        # get part information for this cell
+        part_id = part_ids[cid]
+
+        this_permeability = permeability[cid]
+        this_porosity = porosity[cid]
+        this_thickness = thickness[cid]
+        this_alpha = alpha[cid]
+        this_reference_direction = reference_direction[cid]
+        this_volume = volume[cid]
+        this_type = type[cid]
+        this_area = area[cid]
+
+        name = names[part_id]
+        this_ap = ap[cid]
+        this_cp = cp[cid]
+
+        cell_vertices = Vector{Point3{Float64}}(undef, 3)
+        cell_vertices .= vertices[cellgridid[cid, :]]
+        # create cell struct via basic constructor
+        cell = LcmCell(
+            cid,
+            vertex_ids,
+            cell_vertices,
+            center, 
+            this_part_id,
+            num_neighbours,
+            neighbours,
+            this_thickness,
+            this_area,
+            this_volume,
+            this_permeability,
+            this_porosity,
+            this_ap,
+            this_cp,
+            this_alpha,
+            this_reference_direction,
+            this_type
+        )
+
+        push!(cells, cell)
+    end
+
+    theta = Vector{Float64}(undef, N)
+    temp_Tmat = Vector{Matrix{Float64}}(undef, N)
+    local_verts = Vector{Vector{Point3{Float64}}}(undef, N)
+    for cell in cells     
+        _theta, 
+        _Tmat, 
+        _local_verts = __calculate_local_coordinates(cell)
+
+        theta[cell.id] = _theta
+        temp_Tmat[cell.id] = _Tmat
+        local_verts[cell.id] = _local_verts
+    end
+
+    # loop over cells and add neighbour information
+    for cell in cells
+        
+        for (neighbour_count, neighbour) in enumerate(cells[cell.neighbour_ids])
+
+            face_normal, 
+            center_to_center, 
+            transformation = __calculate_transformation(
+                cell,
+                neighbour,
+                local_verts[cell.id],
+                theta[neighbour.id], 
+                temp_Tmat[cell.id],
+                vertices
+            )
+
+            # calculate face area
+            face_area = __calculate_face_area(
+                cell,
+                neighbour
+            )
+
+            # create NeighbouringCell
+            neighbouring_cell = NeighbouringCell(
+                neighbour.id,
+                face_area,
+                face_normal,
+                center_to_center,
+                transformation
+            )
+            cell.neighbours[neighbour_count] = neighbouring_cell
+        end
+
+    end
+
+    # create fields for easy access to inlet/ outlet/ textile cells
+    inlet_cells = Vector{Int}(undef, 0)
+    outlet_cells = Vector{Int}(undef, 0)
+    textile_cells = Vector{Int}(undef, 0)
+    named_parts = Vector{NamedPart}(undef, 0)
+    for (pid, name) in names
+        cell_ids = partID[part_id]
+        example_cell = cells[cell_ids[1]]
+        type = cell.type
+        part_id = pid
+        
+        if type == inlet::CELLTYPE
+            append!(inlet_cells, cell_ids)
+            push!(named_parts, NamedPart(name, cell_ids))
+        elseif type == outlet::CELLTYPE
+            append!(outlet_cells, cell_ids)
+            push!(named_parts, NamedPart(name, cell_ids))
+        else
+            append!(textile_cells, cell_ids)
+        end
+    end
+
+    # calculate permeability ration, which will be added as a general information
+    permeability_ratio = __calculate_permeability_ratio(cells, textile_cells)
+
+    mesh = LcmMesh(
+        N,
+        vertices,
+        cells,
+        textile_cells,
+        inlet_cells,
+        outlet_cells,
+        named_parts,
+        permeability_ratio
+    )
+
+    return mesh
+end
 
 function create_LcmMesh(meshfile::String, partfile::String)
     # read mesh file, extract basic geometric properties + information about physical groups (base, inlets, outlets, patches)
@@ -83,6 +260,95 @@ function create_LcmMesh(meshfile::String, partfile::String)
         )
 
         push!(cells, cell)
+    
+    
+    
+        theta = Vector{Float64}(undef, N)
+        temp_Tmat = Vector{Matrix{Float64}}(undef, N)
+        local_verts = Vector{Vector{Point3{Float64}}}(undef, N)
+        for cell in cells
+            
+            _theta, 
+            _Tmat, 
+            _local_verts = __calculate_local_coordinates(cell)
+    
+            theta[cell.id] = _theta
+            temp_Tmat[cell.id] = _Tmat
+            local_verts[cell.id] = _local_verts
+        end
+    
+        # loop over cells and add neighbour information
+        for cell in cells
+            
+            for (neighbour_count, neighbour) in enumerate(cells[cell.neighbour_ids])
+    
+                face_normal, 
+                center_to_center, 
+                transformation = __calculate_transformation(
+                    cell,
+                    neighbour,
+                    local_verts[cell.id],
+                    theta[neighbour.id], 
+                    temp_Tmat[cell.id],
+                    vertices
+                )
+    
+                # calculate face area
+                face_area = __calculate_face_area(
+                    cell,
+                    neighbour
+                )
+    
+                # create NeighbouringCell
+                neighbouring_cell = NeighbouringCell(
+                    neighbour.id,
+                    face_area,
+                    face_normal,
+                    center_to_center,
+                    transformation
+                )
+                cell.neighbours[neighbour_count] = neighbouring_cell
+            end
+    
+        end
+    
+        # create fields for easy access to inlet/ outlet/ textile cells
+        inlet_cells = Vector{Int}(undef, 0)
+        outlet_cells = Vector{Int}(undef, 0)
+        textile_cells = Vector{Int}(undef, 0)
+        named_parts = Vector{NamedPart}(undef, 0)
+        for (pid, part) in parts
+            type = part[KEY_TYPE]
+            part_id = part[KEY_PART_ID]
+            name = part[KEY_NAME]
+    
+            cell_ids = partID[part_id]
+            if type == inlet::CELLTYPE
+                append!(inlet_cells, cell_ids)
+                push!(named_parts, NamedPart(name, cell_ids))
+            elseif type == outlet::CELLTYPE
+                append!(outlet_cells, cell_ids)
+                push!(named_parts, NamedPart(name, cell_ids))
+            else
+                append!(textile_cells, cell_ids)
+            end
+        end
+    
+        # calculate permeability ration, which will be added as a general information
+        permeability_ratio = __calculate_permeability_ratio(cells, textile_cells)
+    
+        mesh = LcmMesh(
+            N,
+            vertices,
+            cells,
+            textile_cells,
+            inlet_cells,
+            outlet_cells,
+            named_parts,
+            permeability_ratio
+        )
+    
+        return mesh
     end
 
     theta = Vector{Float64}(undef, N)

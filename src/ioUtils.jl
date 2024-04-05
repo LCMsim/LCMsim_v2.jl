@@ -90,8 +90,11 @@ function save_plottable_mesh(mesh::LcmMesh, filename::String)::Nothing
         permeability = Vector{Float64}(undef, mesh.N)
         porosity = Vector{Float64}(undef, mesh.N)
         volume = Vector{Float64}(undef, mesh.N)
+        area = Vector{Float64}(undef, mesh.N)
         alpha = Vector{Float64}(undef, mesh.N)
         reference_direction = Matrix{Float64}(undef, mesh.N, 3)
+        ap = Vector{Float64}(undef, mesh.N)
+        cp = Vector{Float64}(undef, mesh.N)
 
         for (cid, cell) in enumerate(mesh.cells)  
             cells[cid, :] .= cell.vertex_ids
@@ -101,14 +104,25 @@ function save_plottable_mesh(mesh::LcmMesh, filename::String)::Nothing
             permeability[cid] = cell.permeability
             porosity[cid] = cell.porosity
             volume[cid] = cell.volume
+            area[cid] = cell.area
             alpha[cid] = cell.alpha
             reference_direction[cid, :] = cell.reference_direction
+            ap[cid] = cell.ap
+            cp[cid] = cell.cp
         end
 
         M = length(mesh.vertices)
         vertices = Matrix{Float64}(undef, M, 3)
         for (vid, vertex) in enumerate(mesh.vertices)
             vertices[vid, :] = vertex
+        end
+
+        # collect name, part_id tuples
+        parts = []
+        for part in mesh.named_parts
+            name = part.name
+            part_id = mesh.cells[part.cell_ids[1]].part_id # not very good, data structure misses part_id
+            push!(parts, (name, part_id))
         end
 
         # write data to structured format
@@ -119,6 +133,7 @@ function save_plottable_mesh(mesh::LcmMesh, filename::String)::Nothing
     
             props = create_group(fid, "properties")
             write_dataset(props, "volume", volume)
+            write_dataset(props, "area", area)
             write_dataset(props, "permeability", permeability)
             write_dataset(props, "porosity", porosity)
             write_dataset(props, "thickness", thickness)
@@ -126,6 +141,12 @@ function save_plottable_mesh(mesh::LcmMesh, filename::String)::Nothing
             write_dataset(props, "part_id", part_id)
             write_dataset(props, "alpha", alpha)
             write_dataset(props, "reference_direction", reference_direction)
+            write_dataset(props, "ap", ap)
+            write_dataset(props, "cp", cp)
+            
+            for (name, part_id) in parts
+                write_attribute(props, string(part_id), name)
+            end
         end
 end
 
@@ -211,11 +232,9 @@ end
     Saves a LcmCase object to a jld2 file.
 """
 function save_case(case::LcmCase, path::String)::Nothing
-    # assert that path exists
-    @assert isdir(path) "The given path does not exist."
 
     # save the LcmCase object
-    JLD2.save(path * "/data.jld2", "LcmCase", case)
+    JLD2.save(path, "LcmCase", case)
 end
 
 # funtion to log license and version

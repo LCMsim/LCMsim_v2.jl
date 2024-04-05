@@ -31,7 +31,10 @@ ModelType,
 save_plottable_mesh, 
 save_state, 
 save_case, 
-load_case
+load_case,
+create_LcmMesh,
+State,
+LcmMesh
 
 """
     create(
