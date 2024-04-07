@@ -300,24 +300,26 @@ function __parse_abaqus(filename::String)
         part_id = 6
         ids = []
         for i_inlet in 1:length(inletpos_xyz)
-            #loop over all grids, check if inside sphere with radius r, find attached elements, add them to set with part_id=6
+            #loop over all cells, check if cell center lies inside a sphere with radius r. if so, add cell to set with part_id=6
             xyz_inlet=inletpos_xyz[i_inlet,:]
-            for vert in grid
-                gid = vert[1] 
-                xyz_grid=vert[2][2]
-                vec1=[inletpos_xyz[i_inlet][1]-xyz_grid[1], inletpos_xyz[i_inlet][2]-xyz_grid[2], inletpos_xyz[i_inlet][3]-xyz_grid[3] ]
-                if sqrt(dot(vec1,vec1))<=r_p;
-                    #@info "gid $gid in inlet $i_inlet"                    
-                    for (i, cell) in ctria
-                        verts = cell[2]
-                        id = i
-                        if gid in verts
-                            #@info "cid $id in inlet $i_inlet"
-                            append!(ids, id)
-                        end
-                    end                    
+            for (i, cell) in ctria
+                verts = cell[2]
+                xvec=0.
+                yvec=0.
+                zvec=0.
+                for i_vert in 1:3
+                    xvec=xvec+0.3333*grid[verts[i_vert]][2][1]
+                    yvec=yvec+0.3333*grid[verts[i_vert]][2][2]
+                    zvec=zvec+0.3333*grid[verts[i_vert]][2][3]
                 end
-            end
+                vec1=[inletpos_xyz[i_inlet][1]-xvec, inletpos_xyz[i_inlet][2]-yvec, inletpos_xyz[i_inlet][3]-zvec ]
+                if sqrt(dot(vec1,vec1))<=r_p;     
+                    #@info "xvec,yvec,zvec = $xvec,$yvec,$zvec"          
+                    id = i
+                    #@info "cid $id in inlet $i_inlet"
+                    append!(ids, id)
+                end
+            end     
         end
         ids=unique(ids)
         push!(sets, (part_id, ids))
