@@ -39,9 +39,9 @@ function saveLcmMesh(mesh::LcmMesh, filename::String)
     cellfacearea = Matrix{Float64}(undef, mesh.N, 3)
     cellfacenormal = Array{Float64}(undef, mesh.N, 3, 2)
     cellcentertocellcenter = Array{Float64}(undef, mesh.N, 3, 2)
-    for (cid, cell) in enumerate(mesh.cells)  
+    for (cid, cell) in enumerate(mesh.cells)
         neighbours[cid, 1:cell.num_neighbours] = cell.neighbour_ids
-        centers[cid, :] =  cell.center[1:3]
+        centers[cid, :] = cell.center[1:3]
 
         for nid in 1:cell.num_neighbours
             T11[cid, nid] = cell.neighbours[nid].transformation[1, 1]
@@ -81,73 +81,239 @@ end
     Saves the information needed to plot a mesh in hdf-format.
 """
 function save_plottable_mesh(mesh::LcmMesh, filename::String)::Nothing
-        cells = Matrix{Int}(undef, mesh.N, 3)
+    cells = Matrix{Int}(undef, mesh.N, 3)
 
-        # properties that could be of interest to plot
-        type = Vector{Int}(undef, mesh.N)
-        part_id= Vector{Int}(undef, mesh.N)
-        thickness = Vector{Float64}(undef, mesh.N)
-        permeability = Vector{Float64}(undef, mesh.N)
-        porosity = Vector{Float64}(undef, mesh.N)
-        volume = Vector{Float64}(undef, mesh.N)
-        area = Vector{Float64}(undef, mesh.N)
-        alpha = Vector{Float64}(undef, mesh.N)
-        reference_direction = Matrix{Float64}(undef, mesh.N, 3)
-        ap = Vector{Float64}(undef, mesh.N)
-        cp = Vector{Float64}(undef, mesh.N)
+    # properties that could be of interest to plot
+    type = Vector{Int}(undef, mesh.N)
+    part_id = Vector{Int}(undef, mesh.N)
+    thickness = Vector{Float64}(undef, mesh.N)
+    permeability = Vector{Float64}(undef, mesh.N)
+    porosity = Vector{Float64}(undef, mesh.N)
+    volume = Vector{Float64}(undef, mesh.N)
+    area = Vector{Float64}(undef, mesh.N)
+    alpha = Vector{Float64}(undef, mesh.N)
+    reference_direction = Matrix{Float64}(undef, mesh.N, 3)
+    ap = Vector{Float64}(undef, mesh.N)
+    cp = Vector{Float64}(undef, mesh.N)
 
-        for (cid, cell) in enumerate(mesh.cells)  
-            cells[cid, :] .= cell.vertex_ids
-            type[cid] = Integer(cell.type)
-            part_id[cid] = cell.part_id
-            thickness[cid] = cell.thickness
-            permeability[cid] = cell.permeability
-            porosity[cid] = cell.porosity
-            volume[cid] = cell.volume
-            area[cid] = cell.area
-            alpha[cid] = cell.alpha
-            reference_direction[cid, :] = cell.reference_direction
-            ap[cid] = cell.ap
-            cp[cid] = cell.cp
+    for (cid, cell) in enumerate(mesh.cells)
+        cells[cid, :] .= cell.vertex_ids
+        type[cid] = Integer(cell.type)
+        part_id[cid] = cell.part_id
+        thickness[cid] = cell.thickness
+        permeability[cid] = cell.permeability
+        porosity[cid] = cell.porosity
+        volume[cid] = cell.volume
+        area[cid] = cell.area
+        alpha[cid] = cell.alpha
+        reference_direction[cid, :] = cell.reference_direction
+        ap[cid] = cell.ap
+        cp[cid] = cell.cp
+    end
+
+    M = length(mesh.vertices)
+    vertices = Matrix{Float64}(undef, M, 3)
+    for (vid, vertex) in enumerate(mesh.vertices)
+        vertices[vid, :] = vertex
+    end
+
+    # collect name, part_id tuples
+    parts = []
+    for part in mesh.named_parts
+        name = part.name
+        part_id_ = mesh.cells[part.cell_ids[1]].part_id # not very good, data structure misses part_id
+        push!(parts, (name, part_id_))
+    end
+
+    # write data to structured format
+    h5open(filename, "w") do fid
+        mesh = create_group(fid, "mesh")
+        write_dataset(mesh, "vertices", vertices)
+        write_dataset(mesh, "cells", cells)
+
+        props = create_group(fid, "properties")
+        write_dataset(props, "volume", volume)
+        write_dataset(props, "area", area)
+        write_dataset(props, "permeability", permeability)
+        write_dataset(props, "porosity", porosity)
+        write_dataset(props, "thickness", thickness)
+        write_dataset(props, "type", type)
+        write_dataset(props, "part_id", part_id)
+        write_dataset(props, "alpha", alpha)
+        write_dataset(props, "reference_direction", reference_direction)
+        write_dataset(props, "ap", ap)
+        write_dataset(props, "cp", cp)
+
+        for (name, part_id) in parts
+            write_attribute(props, string(part_id), name)
         end
+        # for base part
+        write_attribute(props, "1", "base")
+    end
+end
 
-        M = length(mesh.vertices)
-        vertices = Matrix{Float64}(undef, M, 3)
-        for (vid, vertex) in enumerate(mesh.vertices)
-            vertices[vid, :] = vertex
-        end
+# functions to load and save models
 
-        # collect name, part_id tuples
-        parts = []
-        for part in mesh.named_parts
-            name = part.name
-            part_id = mesh.cells[part.cell_ids[1]].part_id # not very good, data structure misses part_id
-            push!(parts, (name, part_id))
-        end
+function save_model(model::Union{AbstractModel,Model_2_3}, filename::String)::Nothing
+    error("This is an abstract function.")
+end
 
-        # write data to structured format
-        h5open(filename, "w") do fid
-            mesh = create_group(fid, "mesh")
-            write_dataset(mesh, "vertices", vertices)
-            write_dataset(mesh, "cells", cells)
-    
-            props = create_group(fid, "properties")
-            write_dataset(props, "volume", volume)
-            write_dataset(props, "area", area)
-            write_dataset(props, "permeability", permeability)
-            write_dataset(props, "porosity", porosity)
-            write_dataset(props, "thickness", thickness)
-            write_dataset(props, "type", type)
-            write_dataset(props, "part_id", part_id)
-            write_dataset(props, "alpha", alpha)
-            write_dataset(props, "reference_direction", reference_direction)
-            write_dataset(props, "ap", ap)
-            write_dataset(props, "cp", cp)
-            
-            for (name, part_id) in parts
-                write_attribute(props, string(part_id), name)
-            end
+function load_model(filename::String)::AbstractModel
+    model = nothing
+
+    h5open(filename, "r") do f
+        type = read_attribute(f, "model_type")
+        if type == 1
+            group = f["model"]
+            ap1 = read_attribute(group, "ap1")
+            ap2 = read_attribute(group, "ap2")
+            ap3 = read_attribute(group, "ap3")
+            betat2 = read_attribute(group, "betat2")
+            gamma = read_attribute(group, "gamma")
+            kappa = read_attribute(group, "kappa")
+            p_a = read_attribute(group, "p_a")
+            p_init = read_attribute(group, "p_init")
+            p_ref = read_attribute(group, "p_ref")
+            rho_a = read_attribute(group, "rho_a")
+            rho_init = read_attribute(group, "rho_init")
+            mu_resin = read_attribute(group, "mu_resin")
+
+
+            model = Model_1(
+                p_a,
+                p_init,
+                p_ref,
+                rho_a,
+                rho_init,
+                mu_resin,
+                betat2,
+                ap1,
+                ap2,
+                ap3,
+                kappa,
+                gamma
+            )
+        elseif type == 2
+            group = f["model"]
+            rho_0_air = read_attribute(group, "rho_0_air")
+            rho_0_oil = read_attribute(group, "rho_0_oil")
+            betat2_fac = read_attribute(group, "betat2_fac")
+            betat2 = read_attribute(group, "betat2")
+            exp_val = read_attribute(group, "exp_val")
+            p_a = read_attribute(group, "p_a")
+            p_init = read_attribute(group, "p_init")
+            p_ref = read_attribute(group, "p_ref")
+            rho_a = read_attribute(group, "rho_a")
+            rho_init = read_attribute(group, "rho_init")
+            rho_ref = read_attribute(group, "rho_ref")
+            mu_resin = read_attribute(group, "mu_resin")
+
+            model = Model_2(
+                p_a,
+                p_init,
+                p_ref,
+                rho_a,
+                rho_init,
+                mu_resin,
+                betat2,
+                rho_0_air,
+                rho_0_oil,
+                rho_ref,
+                betat2_fac,
+                exp_val
+            )
+
+        elseif type == 3
+            group = f["model"]
+            rho_0_air = read_attribute(group, "rho_0_air")
+            rho_0_oil = read_attribute(group, "rho_0_oil")
+            betat2_fac = read_attribute(group, "betat2_fac")
+            betat2 = read_attribute(group, "betat2")
+            exp_val = read_attribute(group, "exp_val")
+            p_a = read_attribute(group, "p_a")
+            p_init = read_attribute(group, "p_init")
+            p_ref = read_attribute(group, "p_ref")
+            rho_a = read_attribute(group, "rho_a")
+            rho_init = read_attribute(group, "rho_init")
+            rho_ref = read_attribute(group, "rho_ref")
+            mu_resin = read_attribute(group, "mu_resin")
+
+            model = Model_3(
+                p_a,
+                p_init,
+                p_ref,
+                rho_a,
+                rho_init,
+                mu_resin,
+                betat2,
+                rho_0_air,
+                rho_0_oil,
+                rho_ref,
+                betat2_fac,
+                exp_val
+            )
         end
+    end
+
+    return model
+end
+
+function save_model(model::Model_1, filename::String)::Nothing
+    h5open(filename, "r+") do f
+        write_attribute(f, "model_type", 1)
+        group = create_group(f, "model")
+        write_attribute(group, "ap1", model.ap1)
+        write_attribute(group, "ap2", model.ap2)
+        write_attribute(group, "ap3", model.ap3)
+        write_attribute(group, "betat2", model.betat2,)
+        write_attribute(group, "gamma", model.gamma)
+        write_attribute(group, "kappa", model.kappa)
+        write_attribute(group, "p_init", model.p_init)
+        write_attribute(group, "p_a", model.p_a,)
+        write_attribute(group, "p_ref", model.p_ref)
+        write_attribute(group, "rho_a", model.rho_a)
+        write_attribute(group, "rho_init", model.rho_init)
+        write_attribute(group, "mu_resin", model.mu_resin)
+        write_dataset(group, "dummy", [1])
+    end
+end
+
+function save_model(model::Model_2, filename::String)::Nothing
+    h5open(filename, "r+") do f
+        write_attribute(f, 2, "model_type")
+        group = create_group(f, "model")
+        write_attribute(group, model.rho_0_air, "rho_0_air")
+        write_attribute(group, model.rho_0_oil, "rho_0_oil")
+        write_attribute(group, model.betat2_fac, "betat2_fac")
+        write_attribute(group, model.betat2, "betat2")
+        write_attribute(group, model.exp_val, "exp_val")
+        write_attribute(group, model.p_a, "p_a")
+        write_attribute(group, model.p_init, "p_init")
+        write_attribute(group, model.p_ref, "p_ref")
+        write_attribute(group, model.rho_a, "rho_a")
+        write_attribute(group, model.rho_init, "rho_init")
+        write_attribute(group, model.rho_ref, "rho_ref")
+        write_attribute(group, model.mu_resin, "mu_resin")
+    end
+end
+
+function save_model(model::Model_3, filename::String)::Nothing
+    h5open(filename, "r+") do f
+        write_attribute(f, 3, "model_type")
+        group = create_group(f, "model")
+        write_attribute(group, model.rho_0_air, "rho_0_air")
+        write_attribute(group, model.rho_0_oil, "rho_0_oil")
+        write_attribute(group, model.betat2_fac, "betat2_fac")
+        write_attribute(group, model.betat2, "betat2")
+        write_attribute(group, model.exp_val, "exp_val")
+        write_attribute(group, model.p_a, "p_a")
+        write_attribute(group, model.p_init, "p_init")
+        write_attribute(group, model.p_ref, "p_ref")
+        write_attribute(group, model.rho_a, "rho_a")
+        write_attribute(group, model.rho_init, "rho_init")
+        write_attribute(group, model.rho_ref, "rho_ref")
+        write_attribute(group, model.mu_resin, "mu_resin")
+    end
 end
 
 """
@@ -164,33 +330,81 @@ end
 """
 function save_state(
     state::State,
-    file::String,
+    fid::HDF5.File,
 )::Nothing
-    h5open(file, "r+") do fid
-        statestring = @sprintf("state%09i", state.iter)    
-        state_group = create_group(fid, statestring)
+    statestring = @sprintf("state%09i", state.iter)
+    state_group = create_group(fid, statestring)
 
-        write_attributes(
-            state_group,
-            [
-                (HDF_T, state.t),
-                (HDF_ITER, state.iter), 
-                (HDF_DELTAT, state.deltat)
-            ]
-        )
-        write_datasets(
-            state_group, 
-            [
-                (HDF_P, state.p),
-                (HDF_RHO, state.rho),
-                (HDF_U, state.u),
-                (HDF_V, state.v),
-                (HDF_GAMMA, state.gamma),
-                (HDF_VISCOSITY, state.viscosity),
-                (HDF_CELLPOROSITYTIMESCELLPOROSITY_FACTOR, state.porosity_times_porosity)
-            ]
-        )
+    write_attributes(
+        state_group,
+        [
+            (HDF_T, state.t),
+            (HDF_ITER, state.iter),
+            (HDF_DELTAT, state.deltat)
+        ]
+    )
+    write_datasets(
+        state_group,
+        [
+            (HDF_P, state.p),
+            (HDF_RHO, state.rho),
+            (HDF_U, state.u),
+            (HDF_V, state.v),
+            (HDF_GAMMA, state.gamma),
+            (HDF_VISCOSITY, state.viscosity),
+            (HDF_CELLPOROSITYTIMESCELLPOROSITY_FACTOR, state.porosity_times_porosity)
+        ]
+    )
+end
+
+function save_state(
+    state::State,
+    filename::String
+)::Nothing
+    h5open(filename, "r+") do f
+        save_state(state, f)
     end
+end
+
+function save_states(
+    states::Vector{State},
+    filename::String
+)
+    h5open(filename, "r+") do f
+        for state in states
+            save_state(state, f)
+        end
+    end
+end
+
+# function to load all states in a hdf file
+function load_states(filename::String)::Vector{State}
+    states = []
+    h5open(filename, "r") do f
+        for key in keys(f["/"])
+            g = f[key]
+            if occursin("state", String(key))
+                t = read_attribute(g, "t")
+
+                state = State(
+                    t,
+                    read_attribute(g, "iter"),
+                    read_attribute(g, "deltat"),
+                    read_dataset(g, "p"),
+                    read_dataset(g, "gamma"),
+                    read_dataset(g, "rho"),
+                    read_dataset(g, "u"),
+                    read_dataset(g, "v"),
+                    read_dataset(g, "viscosity"),
+                    read_dataset(g, "cellporositytimesporosityfactor")
+                )
+                push!(states, state)
+            end
+        end
+
+        sort!(states, by=x -> x.t)
+    end
+    return states
 end
 
 """
@@ -198,7 +412,7 @@ end
 
     Checks if the given path exists and returns the path to the hdf5 and jld2 file.
 """
-function check_path(path::String)::Tuple{String, String}
+function check_path(path::String)::Tuple{String,String}
     # assert that path exists
     @assert isdir(path) "The given path does not exist."
 
@@ -250,10 +464,10 @@ function log_license()
     License, or (at your option) any later version. This program is distributed in the hope that it 
     will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
     FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-    
+
     You should have received a copy of the GNU General Public License along with this program. If not, 
     see http://www.gnu.org/licenses/. 
-    
+
     This software is free of charge and may be used for commercial and academic purposes. Please mention 
     the use of this software at an appropriate place in your work.
 
@@ -322,13 +536,13 @@ function load_original_mesh(filename::String)::LcmMesh
             neighbour_ids = [neighbours[j] for j in 1:num_neighbours]
 
             # create tuple from vector of vertex ids for cell
-            vertex_ids = Tuple{Int, Int, Int}(cellgridid[i, :])
+            vertex_ids = Tuple{Int,Int,Int}(cellgridid[i, :])
 
-            area = 0.
+            area = 0.0
             part_id = 0
-            ap = 0. # not suitable for i_model = 3
-            cp = 0. # not suitable for i_model = 3
-            ref_dir = Point3{Float64}([0., 0., 0.]) # not used in simulation
+            ap = 0.0 # not suitable for i_model = 3
+            cp = 0.0 # not suitable for i_model = 3
+            ref_dir = Point3{Float64}([0.0, 0.0, 0.0]) # not used in simulation
 
             cells[i] = LcmCell(
                 i,
@@ -359,9 +573,9 @@ function load_original_mesh(filename::String)::LcmMesh
                 # transformation matrix
                 transformation = Matrix{Float64}(
                     [T11[i, j] T12[i, j];
-                    T21[i, j] T22[i, j]]
+                        T21[i, j] T22[i, j]]
                 )
-                
+
                 # create NeighbouringCell object
                 cells[i].neighbours[j] = NeighbouringCell(
                     neighbour_id,
@@ -383,7 +597,42 @@ function load_original_mesh(filename::String)::LcmMesh
             outlet_cell_ids,
             [],
             permeability_ratio
-        )   
+        )
         return mesh
     end
+end
+
+# load hdf5 project, return a LcmCase with the latest state and a vector with all statestring
+function load_project(filename::String)::Tuple{LcmCase,Vector{State}}
+    model = load_model(filename)
+    mesh = nothing
+    h5open(filename, "r") do f
+        mesh = create_LcmMesh(f)
+    end
+    states = load_states(filename)
+
+    case = LcmCase(mesh, model, last(states))
+
+    return case, states
+end
+
+"""
+    save_project(
+    case::LcmCase,
+    states::Vector{State},
+    filename::String
+)
+
+    Saves project ro hdf-file. Assumes the state of the case to be included in the states vector.
+"""
+function save_project(
+    case::LcmCase,
+    states::Vector{State},
+    filename::String
+)
+    save_plottable_mesh(case.mesh, filename)
+    save_model(case.model, filename)
+
+    save_states(states, filename)
+
 end

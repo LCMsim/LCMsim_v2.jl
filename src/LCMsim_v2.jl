@@ -56,7 +56,7 @@ function create(
     i_model::ModelType
 )::LcmCase
 
-    mesh = create_LcmMesh(meshfile, partfile)
+mesh = create_LcmMesh(meshfile, partfile)
     model = create_SimParameters(mesh, simfile, i_model) 
     state = create_initial_state(mesh, model)
 
@@ -109,8 +109,7 @@ function create(
     )
 
     if save_hdf
-        save_plottable_mesh(case.mesh, hdf_path)
-        save_state(case.state, hdf_path)
+        save_project(case, [case.state], hdf_path)
     end
 
     if save_binary
@@ -170,7 +169,7 @@ function create_and_solve(
     state = case.state
 
     if save_hdf
-        save_plottable_mesh(case.mesh, hdf_path)
+        save_project(case, [case.state], hdf_path)
     end
 
     # if t_step is not given, set it to t_max
@@ -240,7 +239,7 @@ function solve(
     state = case.state
 
     if save_hdf
-        save_plottable_mesh(case.mesh, hdf_path)
+        save_project(case, [case.state], hdf_path)
     end
 
     # if t_step is not given, set it to t_max
@@ -283,7 +282,7 @@ function solve(
     case::LcmCase,
     t_max::Float64,
     verbosity=silent::Verbosity
-)::LcmCase
+)::State
     return solve(case.model, case.mesh, case.state, t_max, verbosity)
 end
 
