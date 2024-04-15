@@ -26,15 +26,32 @@ function parse_HyperMeshNastran(inputfile::String)
     set_parsing_active = false
     dummy_part_id = 1
 
+    #COb: Read not used sets from file "_inputfilename.dat"
+    notusedsets = Vector{Int}(undef, 0)
+    inputfile_parts=splitpath(inputfile)
+    inputfile_parts[end]="_" * inputfile_parts[end]
+    _inputfile=joinpath(inputfile_parts)
+    if isfile(_inputfile) 
+        lines = readlines(_inputfile)
+        ids = [parse(Int, id) for id in split(lines[1],",")]
+        for id in ids
+            push!(notusedsets, id)
+        end
+    end
 
     lines = readlines(inputfile)
 
+    #COb: Modified to assign set numbers in increasing order of reading from mesh file, starting from 2
+    i_set=2
     for line in lines
         if set_parsing_active
             if isdigit(last(strip(line)))
                 push!(temp_set, line)
-                part_id = parse(Int, match(Regex("[0-9]+\\s="), temp_set[1]).match[1:end-1]) + 1  #COb: Why is there a +1 ? Because base is 1 ?
-                                                                                                  #Consecutive numbering in parts file required?
+                part_id = i_set  #parse(Int, match(Regex("[0-9]+\\s="), temp_set[1]).match[1:end-1]) + 1  
+                if (i_set in notusedsets)
+                    part_id = 1
+                end
+                i_set=i_set+1
                 ids = []
            
                 for l in temp_set
@@ -70,7 +87,70 @@ function parse_HyperMeshNastran(inputfile::String)
         elseif !isnothing(match(Regex("SET\\s[0-9]+\\s="), line))
             set_parsing_active = true
             push!(temp_set, line)
+
+            if isdigit(last(strip(line)))
+                part_id = i_set  #parse(Int, match(Regex("[0-9]+\\s="), temp_set[1]).match[1:end-1]) + 1 
+                if (i_set in notusedsets)
+                    part_id = 1
+                end
+                i_set=i_set+1
+                ids = []
+            
+                for l in temp_set
+                    ids_string = match(Regex("([0-9]+,)+[0-9]+"), l).match
+                    append!(ids, split(ids_string, ","))
+                end
+            
+                ids = [parse(Int, id) for id in ids]
+            
+                push!(sets, (part_id, ids))
+                temp_set = []
+                set_parsing_active = false
+            end
         end
+    end
+
+    #COb: if _pset.csv is available in directory with meshfile
+    #     change part_ID to an inlet for all cells which lie inside a sphere with radius
+    filename_parts=splitpath(inputfile)
+    _psetfile=joinpath( joinpath(filename_parts[1:end-1]) ,"_pset.csv")
+    if isfile(_psetfile)
+        #read _psetfile: first line radius, following line inlet points
+        lines = readlines(_psetfile);n_lines=length(lines);r_p=parse(Float64,lines[1])
+        inletpos_xyz=Array{Float64}[]
+        for i_line in 2:n_lines; 
+            str=split(lines[i_line],",")
+            xpos=parse(Float64,str[1])
+            ypos=parse(Float64,str[2])
+            zpos=parse(Float64,str[3])
+            inletpos_xyz=push!(inletpos_xyz,[xpos ypos zpos])
+        end
+        part_id = 6
+        ids = []
+        for i_inlet in 1:length(inletpos_xyz)
+            #loop over all cells, check if cell center lies inside a sphere with radius r. if so, add cell to set with part_id=6
+            xyz_inlet=inletpos_xyz[i_inlet,:]
+            for (i, cell) in ctria
+                verts = cell[2]
+                xvec=0.
+                yvec=0.
+                zvec=0.
+                for i_vert in 1:3
+                    xvec=xvec+0.3333*grid[verts[i_vert]][2][1]
+                    yvec=yvec+0.3333*grid[verts[i_vert]][2][2]
+                    zvec=zvec+0.3333*grid[verts[i_vert]][2][3]
+                end
+                vec1=[inletpos_xyz[i_inlet][1]-xvec, inletpos_xyz[i_inlet][2]-yvec, inletpos_xyz[i_inlet][3]-zvec ]
+                if sqrt(dot(vec1,vec1))<=r_p;     
+                    #@info "xvec,yvec,zvec = $xvec,$yvec,$zvec"          
+                    id = i
+                    #@info "cid $id in inlet $i_inlet"
+                    append!(ids, id)
+                end
+            end     
+        end
+        ids=unique(ids)
+        push!(sets, (part_id, ids))
     end
 
     ctria_vec = Vector{Any}(nothing, length(ctria))
