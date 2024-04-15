@@ -466,7 +466,7 @@ function log_license()
     
     Contributiors:
     - Christof Obertscheider (FHWN): Conceptual design
-    - Leo Heber (ISSE): Software engineering
+    - Leonard Heber (ISSE): Software engineering
     - Ewald Fauster (MUL): Scientific advisor
 
     This program is freely available and open source, licensed under the GNU General Public 
