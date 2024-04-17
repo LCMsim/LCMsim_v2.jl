@@ -16,16 +16,16 @@ The parts defined by the meshfile need additional parameters for the simulation.
 
 | Column name | Description | Value range |
 | :--- | :--- | :--- |      
-| name | Name of the part. Will be used later on <br>to match action to inlets/ outlets | freely choosable |
+| name | Name of the part. Will be used later on <br>to match action to inlets/ outlets | freely choosable (be reasonable) |
 | type | Type of this part | {base, inlet, outlet, patch} |
 | part_id | The physical part ID assigned to the part in the mesh file | determined by mesh file |
 | thickness | | |
 | permeability | | |
-| permeability_noise | | |
+| permeability_noise | percent of deviation applied to permeability values with a normal distribution | 0 - 100 |
 | porosity | | |
-| porosity_noise | | |
-| porosity_1 | | | 
-| p_1 | | | 
+| porosity_noise | percent of deviation applied to porosity values with a normal distribution | 0 - 100 |
+| porosity_1 | reference porosity at pressure p_1 | | 
+| p_1 | reference pressure| | 
 | alpha | | | 
 | refdir_1 | | |
 | refdir_2 | | |
@@ -40,7 +40,7 @@ The parameters for the simulation need to be provided as a .csv-file with the fo
 |rho_ref | |
 | gamma | |
 | mu_resin | viscosity of the resin|
-| p_a | intial pressure ant the inlets |
+| p_a | intial pressure at the inlets |
 | p_init | initial cavity pressure |
 | rho_0_air | density of the air |
 | rho_0_oil | density of the resin |
@@ -78,7 +78,6 @@ Two file formats are used:
 end
 ````
 This enum lets you choose which physical model is applied by the solver. You'll need to pass it to the `create` function.
-After
 
 #### LcmMesh/ LcmCell
 ```
@@ -133,7 +132,7 @@ The state struct describes the time varying variables of a simulation case. The 
 
 #### LcmCase
 ```
-struct LcmCase
+mutable struct LcmCase
     mesh::LcmMesh
     model::AbstractModel
     state::State
@@ -153,6 +152,15 @@ The module will generate HDF files of the following structure:
     - thickness
     - type
     - volume
+    - area
+    - reference_direction
+    - ap
+    - cp
+    - alpha
+    - for each unique part_id
+        - Attribute: <part_id>:[name]
+        - e.g. 1:base
+
 - state000000001
     - cellporositytimecellporosity
     - gamma
@@ -170,8 +178,15 @@ The module will generate HDF files of the following structure:
 
 Depending on the setup of the simulation, a varying number of states will be created. The name of a state indicates the iteration counter.
 All datasets in `properties` and `stateXXXXXXXXX` refer to the cells of the mesh.
+In code usage:
+```
+using HDF5
+# load case from the hdf5 file
+case, states = load_project(path) # case::LcmCase, states::Vector{State}
 
-Currently it is not possible to (re)start the solver directly from a these files, since they are meant solely as a way to output the results.
+# save case to hdf5 file
+save_project(case, states, path)
+```
 
 #### JLD2
 The binary files created by LCMsim_v2 contain an entire `LcmCase` struct. There are convenience functions to create such a file and start/ continue a simulation directly from the file path.
@@ -229,13 +244,13 @@ solve!(
     t_max::Float64,
     actions::Vector{Tuple{String, Float64}},
     verbosity=silent::Verbosity
-)::LcmCase
+)::State
 ```
 Applies pressure actions and solves the problem for the given LcmCase up to the specified end time.
 One action is a tuple of a part name and a pressure value.
 For every existing inlet and outlet, an action needs to be provided.
 Mutates the given LcmCase by replacing the state, but does not mutate the old state itself.
-Returns the mutated LcmCase.
+Returns the new state.
 
 ```
 solve(
@@ -268,3 +283,31 @@ create_and_solve(
 ````
 Convenience function the behaves like `create` and `solve`.
 
+#### continue_and_solve
+```
+    continue_and_solve(
+	    source_path::String,
+        save_path::String,
+        meshfile::String,
+        partfile::String,
+        simfile::String,
+        i_model::ModelType,
+        t_max::Float64,
+        output_intervals::Int,
+        verbosity=verbose::Verbosity,
+        save_binary::Bool=true,
+        save_hdf::Bool=true
+    )::Nothing
+```
+
+This function allows to continue a simulation. 
+A new LcmCase is created but the initial values are from the a saved LcmCase
+Creates a mesh, a model and an initial state from the given files.
+The model is chosen according to the given i_model.
+Then solves the problem up to the specified end time.
+Saves results in hdf5 format at the specified output intervals.
+If t_step is not given, it is set to t_max, aka the results are only saved at the end.
+Additionally saves the resulting LcmCase as binary in jld2 format.
+
+### HDF interface
+There is currently no function to solve a case directly from an HDF file. However, with the provided functions to load and save projects, you can easily implement this behaviour yourself. 

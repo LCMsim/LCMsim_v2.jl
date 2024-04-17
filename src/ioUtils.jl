@@ -154,10 +154,22 @@ end
 
 # functions to load and save models
 
+"""
+    save_model(model::Union{AbstractModel,Model_2_3}, filename::String)::Nothing
+
+    Abstract method, will throw error.
+    Concrete implementations are provided for Model_1, Model_2 and Model_3.
+"""
 function save_model(model::Union{AbstractModel,Model_2_3}, filename::String)::Nothing
     error("This is an abstract function.")
 end
 
+"""
+    load_model(filename::String)::AbstractModel
+
+    Loads model from a hdf5 file.
+    Decides which model to load based on the model_type attribute.
+"""
 function load_model(filename::String)::AbstractModel
     model = nothing
 
@@ -258,6 +270,11 @@ function load_model(filename::String)::AbstractModel
     return model
 end
 
+"""
+    save_model(model::Model_1, filename::String)::Nothing
+
+    Saves a Model_1 object to a hdf5 file.
+"""
 function save_model(model::Model_1, filename::String)::Nothing
     h5open(filename, "r+") do f
         write_attribute(f, "model_type", 1)
@@ -278,6 +295,11 @@ function save_model(model::Model_1, filename::String)::Nothing
     end
 end
 
+"""
+    save_model(model::Model_2, filename::String)::Nothing
+
+    Saves a Model_2 object to a hdf5 file.
+"""
 function save_model(model::Model_2, filename::String)::Nothing
     h5open(filename, "r+") do f
         write_attribute(f, "model_type", 2) 
@@ -297,6 +319,11 @@ function save_model(model::Model_2, filename::String)::Nothing
     end
 end
 
+"""
+    save_model(model::Model_3, filename::String)::Nothing
+
+    Saves a Model_3 object to a hdf5 file.
+"""
 function save_model(model::Model_3, filename::String)::Nothing
     h5open(filename, "r+") do f
         write_attribute(f, "model_type", 3)
@@ -357,6 +384,15 @@ function save_state(
     )
 end
 
+
+"""
+    save_state(
+    state::State,
+    filename::String
+)::Nothing
+
+    Saves a state to an existing hdf5 file.
+"""
 function save_state(
     state::State,
     filename::String
@@ -366,6 +402,14 @@ function save_state(
     end
 end
 
+"""
+    save_states(
+        states::Vector{State},
+        filename::String
+    )::Nothing
+
+    Saves a vector of states to an existing hdf5 file.
+"""
 function save_states(
     states::Vector{State},
     filename::String
