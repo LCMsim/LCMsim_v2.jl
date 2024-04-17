@@ -3,6 +3,13 @@ using HDF5
 using LinearAlgebra
 using GeometryBasics
 using StaticArraysCore
+using Random
+
+rng = MersenneTwister(1234)
+
+function seed!(seed::Int)
+    global rng = MersenneTwister(seed)
+end
 
 function create_LcmMesh(file::HDF5.File)
     cellgridid = read_dataset(file["/mesh"], "cells")
@@ -460,14 +467,20 @@ end
     Calculates the permeability of a cell given the permeability and the permeability noise.
 """
 function __calculate_permeability(permeability::Float64, permeability_noise::Float64)::Float64
-    return permeability
+    if permeability_noise == 0.0
+        return permeability
+    end
+    return randn(rng, Float64) * permeability_noise * permeability + permeability
 end
 
 """
     Calculates the porosity of a cell given the porosity and the porosity noise.
 """
 function __calculate_porosity(porosity::Float64, porosity_noise::Float64)::Float64
-    return porosity
+    if porosity_noise == 0.0
+        return porosity
+    end
+    return randn(rng, Float64) * porosity_noise * porosity + porosity
 end
 
 """

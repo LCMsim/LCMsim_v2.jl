@@ -21,9 +21,9 @@ The parts defined by the meshfile need additional parameters for the simulation.
 | part_id | The physical part ID assigned to the part in the mesh file | determined by mesh file |
 | thickness | | |
 | permeability | | |
-| permeability_noise | percent of deviation applied to permeability values with a normal distribution | 0 - 100 |
+| permeability_noise | fraction of deviation applied to permeability values with a normal distribution | 0 - 100 |
 | porosity | | |
-| porosity_noise | percent of deviation applied to porosity values with a normal distribution | 0 - 100 |
+| porosity_noise | fraction of deviation applied to porosity values with a normal distribution | 0 - 100 |
 | porosity_1 | reference porosity at pressure p_1 | | 
 | p_1 | reference pressure| | 
 | alpha | | | 
