@@ -164,7 +164,9 @@ function create_and_solve(
         partfile,
         simfile,
         i_model,
-        save_path
+        save_path,
+        save_binary,
+        save_hdf
     )
     # retrieve initial state
     state = case.state
