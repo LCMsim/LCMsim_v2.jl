@@ -414,16 +414,17 @@ function apply_pressure!(
     actions::Vector{Tuple{String, Float64}}
 )::LcmCase
     given_names = sort([action[1] for action in actions])
-    existing_names = sort(part.name for part in case.mesh.named_parts)
+    existing_names = sort([part.name for part in case.mesh.named_parts])
 
     @assert given_names == existing_names "Given names do not match existing names."
 
     state = deepcopy(case.state)
 
     for action in actions
-        part = findfirst(part -> part.name == action[1], case.mesh.named_parts)
+        part_index = findfirst(part -> part.name == action[1], case.mesh.named_parts)
+        part = case.mesh.named_parts[part_index]
         for cell in case.mesh.cells[part.cell_ids]
-            state.p[cell.id] .= action[2]
+            state.p[cell.id] = action[2]
         end
     end
 
@@ -438,13 +439,13 @@ end
         t_max::Float64,
         actions::Vector{Tuple{String, Float64}},
         verbosity=silent::Verbosity
-    )::LcmCase
+    )::State
 
     Applies pressure actions and solves the problem for the given LcmCase up to the specified end time.
     One action is a tuple of a part name and a pressure value.
     For every existing inlet and outlet, an action needs to be provided.
     Mutates the given LcmCase by replacing the state, but does not mutate the old state itself.
-    Returns the mutated LcmCase.
+    Returns the new state.
 """
 function solve!(
     case::LcmCase,
@@ -454,7 +455,7 @@ function solve!(
 )::State
     case = apply_pressure!(case, actions)
     case.state = solve(case, t_max, verbosity)
-    return case
+    return case.state
 end
 
 ##################################################################################################

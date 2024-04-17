@@ -449,7 +449,7 @@ A struct representing an LcmCase.
 - `model::AbstractModel`: The Model associated with the case.
 - `state::State`: The State associated with the case.
 """
-struct LcmCase
+mutable struct LcmCase
     mesh::LcmMesh
     model::AbstractModel
     state::State
