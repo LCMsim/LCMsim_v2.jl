@@ -279,8 +279,21 @@ function continue_and_solve(
         state.porosity_times_porosity
     )
 
+    #COb: Apply new boundary conditions if changed
+    state.p[case.mesh.inlet_cell_ids] .= case.model.p_a
+    state.u[case.mesh.inlet_cell_ids] .= U_A
+    state.v[case.mesh.inlet_cell_ids] .= V_A
+    state.rho[case.mesh.inlet_cell_ids] .= case.model.rho_a
+    state.gamma[case.mesh.inlet_cell_ids] .= GAMMA_A
+    state.p[case.mesh.outlet_cell_ids] .= case.model.p_init
+    state.u[case.mesh.outlet_cell_ids] .= U_INIT
+    state.v[case.mesh.outlet_cell_ids] .= V_INIT
+    state.rho[case.mesh.outlet_cell_ids] .= case.model.rho_init
+    state.gamma[case.mesh.outlet_cell_ids] .= GAMMA_INIT
+
     if save_hdf
         save_plottable_mesh(case.mesh, hdf_path)
+        save_state(state, hdf_path)
     end
 
     # if t_step is not given, set it to t_max
@@ -784,12 +797,12 @@ function solve(
     viscosity = deepcopy(old_state.viscosity)
     cellporositytimesporosityfactor_old = deepcopy(old_state.porosity_times_porosity)
 
-    # vectors for new state
-    p_new = zeros(Float64, mesh.N)
-    rho_new = zeros(Float64, mesh.N)
-    u_new = zeros(Float64, mesh.N)
-    v_new = zeros(Float64, mesh.N)
-    gamma_new = zeros(Float64, mesh.N)
+    # vectors for new state; already here the boundary conditions are set because not changed inside t loop
+    p_new = deepcopy(p_old)
+    rho_new = deepcopy(rho_old)
+    u_new = deepcopy(u_old)
+    v_new = deepcopy(v_old)
+    gamma_new = deepcopy(gamma_old)
 
     if verbosity == verbose::Verbosity
         @info "Start solving at t = $t."
@@ -893,20 +906,6 @@ function solve(
             p_old[cell.id] = p_new[cell.id] + 0.0
             gamma_old[cell.id] = gamma_new[cell.id] + 0.0
         end
-
-        #COb: The following section was lost
-        #boundary conditions, only for pressure boundary conditions
-        # TODO implement possible viscosity boundary conditions
-        p_new[mesh.inlet_cell_ids] .= model.p_a
-        u_new[mesh.inlet_cell_ids] .= U_A
-        v_new[mesh.inlet_cell_ids] .= V_A
-        rho_new[mesh.inlet_cell_ids] .= model.rho_a
-        gamma_new[mesh.inlet_cell_ids] .= GAMMA_A
-        p_new[mesh.outlet_cell_ids] .= model.p_init
-        u_new[mesh.outlet_cell_ids] .= U_INIT
-        v_new[mesh.outlet_cell_ids] .= V_INIT
-        rho_new[mesh.outlet_cell_ids] .= model.rho_init
-        gamma_new[mesh.outlet_cell_ids] .= GAMMA_INIT
 
         if verbosity == verbose::Verbosity
             percent = round(Int, 100 * (t - old_state.t) / (t_next - old_state.t))
