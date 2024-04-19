@@ -233,7 +233,7 @@ function create_LcmMesh(meshfile::String, partfile::String)
         reference_direction = part_parameters[KEY_REFERENCE_DIRECTION]
 
         type = part_parameters[KEY_TYPE]
-        if type != inlet::CELLTYPE & type != outlet::CELLTYPE & type_wall[cid] == wall::CELLTYPE
+        if type != inlet::CELLTYPE && type != outlet::CELLTYPE && type_wall[cid] == wall::CELLTYPE
             type = wall::CELLTYPE
         end
 
