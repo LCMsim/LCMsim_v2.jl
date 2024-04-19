@@ -926,6 +926,11 @@ function solve(
                 v_new,
                 Δt
             )
+
+            if isnan(Δt) || isinf(Δt)
+                @error "Δt is NaN or Inf. Stopping simulation."
+                break
+            end
         end
         
         iter = iter + 1
