@@ -360,7 +360,7 @@ function create_LcmMesh(meshfile::String, partfile::String)
     return mesh
 end
 
-function __get_neighbours(cellgridid::Matrix{Int})::Vector{Vector{Int}}
+function __get_neighbours(cellgridid::Matrix{Int})::Tuple{Vector{Vector{Int}}, Vector{CELLTYPE}}
     N = size(cellgridid)[1]
     maxnumberofneighbours = 10
 
