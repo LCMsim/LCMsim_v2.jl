@@ -51,7 +51,7 @@ function create_LcmMesh(file::HDF5.File)
     end
 
     # calculate neighbours and centers
-    each_cells_neighbours = __get_neighbours(cellgridid)
+    each_cells_neighbours, _ = __get_neighbours(cellgridid)
     vertices = [Point3{Float64}(vertices[i, :]) for i in 1:size(vertices)[1]]
     centers = __calculate_cellcenters(cellgridid, vertices)
 
@@ -210,7 +210,7 @@ function create_LcmMesh(meshfile::String, partfile::String)
     end
 
     # calculate neighbours and centers
-    each_cells_neighbours = __get_neighbours(cellgridid)
+    each_cells_neighbours, type_wall = __get_neighbours(cellgridid)
     centers = __calculate_cellcenters(cellgridid, vertices)
 
     # loop to create all cells with basic information
@@ -231,13 +231,12 @@ function create_LcmMesh(meshfile::String, partfile::String)
         thickness = part_parameters[KEY_THICKNESS]
         alpha = part_parameters[KEY_ALPHA]
         reference_direction = part_parameters[KEY_REFERENCE_DIRECTION]
+
         type = part_parameters[KEY_TYPE]
-        # TODO not happy with this logic here
-        if num_neighbours == 2
+        if type != inlet::CELLTYPE & type != outlet::CELLTYPE & type_wall[cid] == wall::CELLTYPE
             type = wall::CELLTYPE
         end
 
-        # TODO not happy with this logic here
         name = part_parameters["name"]
         porosity_1 = part_parameters[KEY_POROSITY_1]
         p_1 = part_parameters[KEY_P_1]
@@ -369,7 +368,8 @@ function __get_neighbours(cellgridid::Matrix{Int})::Vector{Vector{Int}}
     # and identify wall cells
 
     # initialize celltype with 1 = for every cell
-    celltype = zeros(Int, N) .+ Integer(inner::CELLTYPE)
+    celltype = Vector{CELLTYPE}(undef, N)
+    celltype .= inner::CELLTYPE
 
     faces = Array{Int32}(undef, 0, 3)   #three columns: sgrid id1, grid id2, cell id
     i = 1
@@ -405,7 +405,7 @@ function __get_neighbours(cellgridid::Matrix{Int})::Vector{Vector{Int}}
             inds4 = findall(!isequal(j), inds3)
             inds5 = inds3[inds4]
             if isempty(inds5)
-                celltype[i1] = Integer(wall::CELLTYPE)
+                celltype[i1] = wall::CELLTYPE
             else
                 if j == 1
                     for k in 1:length(inds5)
@@ -439,7 +439,7 @@ function __get_neighbours(cellgridid::Matrix{Int})::Vector{Vector{Int}}
         valid_indices = cellneighboursarray[ind, :] .!= -9
         push!(cellneighbours, Int.(cellneighboursarray[ind, valid_indices]))
     end 
-    return cellneighbours
+    return cellneighbours, celltype
 end
 
 """
