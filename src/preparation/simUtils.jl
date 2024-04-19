@@ -129,13 +129,18 @@ function create_SimParameters(
         exp_val = 1.
 
         # TODO kann permeability_ratio > 100 sein? nicht > 1.0?
-        if mesh.permeability_ratio >= 100
-            betat2_fac = 0.1  #1.0  #0.25  #
-            exp_val = 25  #4;  #10;  #
-        else
-            betat2_fac = 1.0  #0.1  #0.25  #
-            exp_val = 4  #25;  #10;  #
-        end
+        #if mesh.permeability_ratio >= 100
+        #    betat2_fac = 0.01  #1.0  #0.25  #
+        #    exp_val = 25  #4;  #10;  #
+        #else
+        #    betat2_fac = 1.0  #0.1  #0.25  #
+        #    exp_val = 4  #25;  #10;  #
+        #end
+        #COb: Linear functions of permeabiliity ratio
+        exp_val=floor(4+(25-4)/(1250-1)*(mesh.permeability_ratio-1))
+        betat2_fac=1.0+(0.01-1.0)/(1250-1)*(mesh.permeability_ratio-1)
+        #@info "betat2_fac = $betat2_fac"  #COb
+        #@info "exp_val = $exp_val"  #COb
 
         betat2= 0.1 * betat2_fac;
 

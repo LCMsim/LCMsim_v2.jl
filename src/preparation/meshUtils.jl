@@ -236,7 +236,7 @@ function create_LcmMesh(meshfile::String, partfile::String)
         p_1 = part_parameters[KEY_P_1]
         ap = porosity
         cp = (porosity_1 - porosity) / (p_1^2)
-        @assert (ap + cp * (1e5^2)) <= 0.9 "Part " * name * ": Porosity for 1e5 Pa is greater than threshold =" * string(ap + cp * (1e5^2)) * "; Please modify input values."
+        @assert (ap + cp * (1e5^2)) <= 0.99 "Part " * name * ": Porosity for 1e5 Pa is greater than threshold =" * string(ap + cp * (1e5^2)) * "; Please modify input values."
 
         area, volume = __calculate_area_and_volume(cid, thickness, cellgridid, vertices)
 

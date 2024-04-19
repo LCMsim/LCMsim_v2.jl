@@ -167,7 +167,7 @@ function parse_HyperMeshNastran(inputfile::String)
         pid = cell[2][1]
         verts = cell[2][2]
         verts = [grid[gid][1] for gid in verts]
-        ctria_vec[cid] = [pid, verts...]
+        ctria_vec[i] = [pid, verts...]  #ctria_vec[cid] = [pid, verts...]  #COb: index bug fix
     end
 
 
