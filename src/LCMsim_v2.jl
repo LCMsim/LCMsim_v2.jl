@@ -333,6 +333,71 @@ function continue_and_solve(
     end
 end
 
+"""
+    create_and_solve_gui(
+        save_path::String,
+        meshfile::String,
+        partfile::String,
+        simfile::String,
+        i_model::ModelType,
+        t_max::Float64,
+        t_step::Float64,
+        verbosity=verbose::Verbosity,
+        save_binary::Bool=true,
+        save_hdf::Bool=true
+    )::Nothing
+
+    Wrapper around create_and_solve
+"""
+function create_and_solve_gui(
+    save_path::String,
+    meshfile::String,
+    partfile::String,
+    simfile::String,
+    i_model::ModelType,
+    t_max::Float64,
+    output_intervals::Int,
+    verbosity=verbose::Verbosity,
+    save_binary::Bool=true,
+    save_hdf::Bool=true  
+)::Nothing
+    t_step=t_max/output_intervals
+    create_and_solve(save_path,meshfile,partfile,simfile,i_model,t_max,t_step,verbosity,save_binary,save_hdf)
+end
+
+"""
+    continue_and_solve_gui(
+	    source_path::String,
+        save_path::String,
+        meshfile::String,
+        partfile::String,
+        simfile::String,
+        i_model::ModelType,
+        t_max::Float64,
+        output_intervals::Int,
+        verbosity=verbose::Verbosity,
+        save_binary::Bool=true,
+        save_hdf::Bool=true
+    )::Nothing
+
+    Wrapper around continue_and_solve
+"""
+function continue_and_solve_gui(
+    source_path::String,
+	save_path::String,
+    meshfile::String,
+    partfile::String,
+    simfile::String,
+    i_model::ModelType,
+    t_max::Float64,
+    output_intervals=Int(4),
+    verbosity=verbose::Verbosity,
+    save_binary::Bool=true,
+    save_hdf::Bool=true  
+)::Nothing
+    continue_and_solve(source_path,save_path,meshfile,partfile,simfile,i_model,t_max,output_intervals,verbosity,save_binary,save_hdf)
+end
+
 
 """
     solve(

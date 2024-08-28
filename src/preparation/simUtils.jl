@@ -140,7 +140,7 @@ function create_SimParameters(
         exp_val=floor(4+(25-4)/(1250-1)*(mesh.permeability_ratio-1))
         betat2_fac=1.0+(0.01-1.0)/(1250-1)*(mesh.permeability_ratio-1)
         #@info "betat2_fac = $betat2_fac"  #COb
-        #@info "exp_val = $exp_val"  #COb
+        #@info "exp_val = $exp_val"  #COb 
 
         betat2= 0.1 * betat2_fac;
 

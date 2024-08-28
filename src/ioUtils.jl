@@ -508,7 +508,7 @@ function log_license()
     LCMsim v2 is Julia code which simulates the mold filling in Liquid Composite Molding (LCM) 
     manufacturing process. 
     
-    Contributiors:
+    Contributors:
     - Christof Obertscheider (FHWN): Conceptual design
     - Leonard Heber (ISSE): Software engineering
     - Ewald Fauster (MUL): Scientific advisor

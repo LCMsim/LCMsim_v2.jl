@@ -142,7 +142,7 @@ function __parse_abaqus(filename::String)
 	elementind = Int(1);
 	setelementind = Int(1);
 	setind = Int(0);
-	pids = Vector{Int}(undef, 0)
+	pids = []
     origgridid=[];
     gridx=[];
     gridy=[];
@@ -252,11 +252,10 @@ function __parse_abaqus(filename::String)
 				txt1=replace(txt1," "=> "")
 				txt2=split(txt1,",")
 				for i in 1:length(txt2)
-					if !isempty(txt2[i])
-						push!(pids, parse(Int64,txt2[i]))
+					if !isempty(txt2[i])						
+                        append!(pids, parse(Int64,txt2[i]))  #push!(pids, parse(Int64,txt2[i]))
 					end
 				end			
-
 			end
 		end		
 		
@@ -276,6 +275,7 @@ function __parse_abaqus(filename::String)
 			set_parsing_active=true  #issetdefinition=Int64(1);
 			setelementind=1
 			setind=setind+1
+            pids=[]  #empty!(pids)
 		end
 		
 		
@@ -324,11 +324,6 @@ function __parse_abaqus(filename::String)
         ids=unique(ids)
         push!(sets, (part_id, ids))
     end
-    
-    #@info "ctria = " * string(ctria)
-    #@info "grid = " * string(grid)
-    #@info "sets = " * string(sets)
-    #error("11")
 
     ctria_vec = Vector{Any}(nothing, length(ctria))
     grid_vec = Vector{Any}(nothing, length(grid))
@@ -346,7 +341,6 @@ function __parse_abaqus(filename::String)
         verts = [grid[gid][1] for gid in verts]
         ctria_vec[i] = [pid, verts...]   #COb: index bug fix
     end
-
 
     for vert in grid
         gid = vert[2][1] # gid after renaming
