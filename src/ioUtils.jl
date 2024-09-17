@@ -189,7 +189,11 @@ function load_model(filename::String)::AbstractModel
             rho_a = read_attribute(group, "rho_a")
             rho_init = read_attribute(group, "rho_init")
             mu_resin = read_attribute(group, "mu_resin")
-
+            k_doc= read_attribute(group, "k_doc")
+            n_doc= read_attribute(group, "n_doc")
+            doc_init = read_attribute(group, "doc_init")
+            doc_a = read_attribute(group, "doc_a")
+            k_mu = read_attribute(group, "k_mu")
 
             model = Model_1(
                 p_a,
@@ -203,7 +207,12 @@ function load_model(filename::String)::AbstractModel
                 ap2,
                 ap3,
                 kappa,
-                gamma
+                gamma,
+                k_doc,
+                n_doc,
+                doc_init,
+                doc_a,
+                k_mu
             )
         elseif type == 2
             group = f["model"]
@@ -219,6 +228,11 @@ function load_model(filename::String)::AbstractModel
             rho_init = read_attribute(group, "rho_init")
             rho_ref = read_attribute(group, "rho_ref")
             mu_resin = read_attribute(group, "mu_resin")
+            k_doc= read_attribute(group, "k_doc")
+            n_doc= read_attribute(group, "n_doc")
+            doc_init = read_attribute(group, "doc_init")
+            doc_a = read_attribute(group, "doc_a")
+            k_mu = read_attribute(group, "k_mu")
 
             model = Model_2(
                 p_a,
@@ -232,7 +246,12 @@ function load_model(filename::String)::AbstractModel
                 rho_0_oil,
                 rho_ref,
                 betat2_fac,
-                exp_val
+                exp_val,
+                k_doc,
+                n_doc,
+                doc_init,
+                doc_a,
+                k_mu
             )
 
         elseif type == 3
@@ -249,6 +268,11 @@ function load_model(filename::String)::AbstractModel
             rho_init = read_attribute(group, "rho_init")
             rho_ref = read_attribute(group, "rho_ref")
             mu_resin = read_attribute(group, "mu_resin")
+            k_doc= read_attribute(group, "k_doc")
+            n_doc= read_attribute(group, "n_doc")
+            doc_init = read_attribute(group, "doc_init")
+            doc_a = read_attribute(group, "doc_a")
+            k_mu = read_attribute(group, "k_mu")
 
             model = Model_3(
                 p_a,
@@ -262,8 +286,53 @@ function load_model(filename::String)::AbstractModel
                 rho_0_oil,
                 rho_ref,
                 betat2_fac,
-                exp_val
+                exp_val,
+                k_doc,
+                n_doc,
+                doc_init,
+                doc_a,
+                k_mu
             )
+
+        elseif type == 4
+            group = f["model"]
+            rho_0_air = read_attribute(group, "rho_0_air")
+            rho_0_oil = read_attribute(group, "rho_0_oil")
+            betat2_fac = read_attribute(group, "betat2_fac")
+            betat2 = read_attribute(group, "betat2")
+            exp_val = read_attribute(group, "exp_val")
+            p_a = read_attribute(group, "p_a")
+            p_init = read_attribute(group, "p_init")
+            p_ref = read_attribute(group, "p_ref")
+            rho_a = read_attribute(group, "rho_a")
+            rho_init = read_attribute(group, "rho_init")
+            rho_ref = read_attribute(group, "rho_ref")
+            mu_resin = read_attribute(group, "mu_resin")
+            k_doc= read_attribute(group, "k_doc")
+            n_doc= read_attribute(group, "n_doc")
+            doc_init = read_attribute(group, "doc_init")
+            doc_a = read_attribute(group, "doc_a")
+            k_mu = read_attribute(group, "k_mu")
+
+            model = Model_4(
+                p_a,
+                p_init,
+                p_ref,
+                rho_a,
+                rho_init,
+                mu_resin,
+                betat2,
+                rho_0_air,
+                rho_0_oil,
+                rho_ref,
+                betat2_fac,
+                exp_val,
+                k_doc,
+                n_doc,
+                doc_init,
+                doc_a,
+                k_mu
+            )    
         end
     end
 
@@ -292,6 +361,8 @@ function save_model(model::Model_1, filename::String)::Nothing
         write_attribute(group, "rho_init", model.rho_init)
         write_attribute(group, "mu_resin", model.mu_resin)
         write_dataset(group, "dummy", [1])
+        write_attribute(group, "doc_init", model.doc_init)
+        write_attribute(group, "doc_a", model.doc_a)
     end
 end
 
@@ -316,6 +387,8 @@ function save_model(model::Model_2, filename::String)::Nothing
         write_attribute(group, "rho_init", model.rho_init)
         write_attribute(group, "rho_ref", model.rho_ref)
         write_attribute(group, "mu_resin", model.mu_resin)
+        write_attribute(group, "doc_init", model.doc_init)
+        write_attribute(group, "doc_a", model.doc_a)
     end
 end
 
@@ -340,6 +413,34 @@ function save_model(model::Model_3, filename::String)::Nothing
         write_attribute(group, "rho_init", model.rho_init)
         write_attribute(group, "rho_ref", model.rho_ref)
         write_attribute(group, "mu_resin", model.mu_resin)
+        write_attribute(group, "doc_init", model.doc_init)
+        write_attribute(group, "doc_a", model.doc_a)
+    end
+end
+
+"""
+    save_model(model::Model_4, filename::String)::Nothing
+
+    Saves a Model_4 object to a hdf5 file.
+"""
+function save_model(model::Model_4, filename::String)::Nothing
+    h5open(filename, "r+") do f
+        write_attribute(f, "model_type", 4) 
+        group = create_group(f, "model")
+        write_attribute(group, "rho_0_air", model.rho_0_air)
+        write_attribute(group, "rho_0_oil", model.rho_0_oil)
+        write_attribute(group, "betat2_fac", model.betat2_fac)
+        write_attribute(group, "betat2", model.betat2)
+        write_attribute(group, "exp_val", model.exp_val)
+        write_attribute(group, "p_a", model.p_a)
+        write_attribute(group, "p_init", model.p_init)
+        write_attribute(group, "p_ref", model.p_ref)
+        write_attribute(group, "rho_a", model.rho_a)
+        write_attribute(group, "rho_init", model.rho_init)
+        write_attribute(group, "rho_ref", model.rho_ref)
+        write_attribute(group, "mu_resin", model.mu_resin)
+        write_attribute(group, "doc_init", model.doc_init)
+        write_attribute(group, "doc_a", model.doc_a)
     end
 end
 
@@ -379,7 +480,8 @@ function save_state(
             (HDF_V, state.v),
             (HDF_GAMMA, state.gamma),
             (HDF_VISCOSITY, state.viscosity),
-            (HDF_CELLPOROSITYTIMESCELLPOROSITY_FACTOR, state.porosity_times_porosity)
+            (HDF_CELLPOROSITYTIMESCELLPOROSITY_FACTOR, state.porosity_times_porosity),
+            (HDF_DOC, state.doc)
         ]
     )
 end

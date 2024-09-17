@@ -64,17 +64,40 @@ end
 function parse_paramter_file(filename::String)
     sim_params = CSV.File(filename)
     column_names = ["p_ref", "rho_ref", "gamma", "mu_resin", "p_a", "p_init", "rho_0_air", "rho_0_oil"]
-    @assert issetequal(String.(sim_params.names), column_names) "Invalid column name in parameter file!"
+    column_names1 = ["p_ref", "rho_ref", "gamma", "mu_resin", "p_a", "p_init", "rho_0_air", "rho_0_oil", "k_doc", "n_doc", "k_mu"]
+
+    @assert (issetequal(String.(sim_params.names), column_names) ||  issetequal(String.(sim_params.names), column_names1)) "Invalid column name in parameter file!"
     @assert sim_params.rows == 1 "More than 1 row in parameter file not allowed."
 
-    p_ref = sim_params["p_ref"][1]
-    rho_ref = sim_params["rho_ref"][1]
-    gamma = sim_params["gamma"][1]
-    mu_resin = sim_params["mu_resin"][1]
-    p_a = sim_params["p_a"][1]
-    p_init = sim_params["p_init"][1]
-    rho_0_air = float(sim_params["rho_0_air"][1])
-    rho_0_oil = float(sim_params["rho_0_oil"][1])
+    if issetequal(String.(sim_params.names), column_names)
+        p_ref = sim_params["p_ref"][1]
+        rho_ref = sim_params["rho_ref"][1]
+        gamma = sim_params["gamma"][1]
+        mu_resin = sim_params["mu_resin"][1]
+        p_a = sim_params["p_a"][1]
+        p_init = sim_params["p_init"][1]
+        rho_0_air = float(sim_params["rho_0_air"][1])
+        rho_0_oil = float(sim_params["rho_0_oil"][1])
+        k_doc=1.
+        n_doc=1.
+        doc_a=0.
+        doc_init=0.
+        k_mu=0.
+    elseif issetequal(String.(sim_params.names), column_names1)
+        p_ref = sim_params["p_ref"][1]
+        rho_ref = sim_params["rho_ref"][1]
+        gamma = sim_params["gamma"][1]
+        mu_resin = sim_params["mu_resin"][1]
+        p_a = sim_params["p_a"][1]
+        p_init = sim_params["p_init"][1]
+        rho_0_air = float(sim_params["rho_0_air"][1])
+        rho_0_oil = float(sim_params["rho_0_oil"][1])
+        k_doc = float(sim_params["k_doc"][1])
+        n_doc = float(sim_params["n_doc"][1])
+        doc_a=0.
+        doc_init=0.
+        k_mu = float(sim_params["k_mu"][1])
+    end
 
     return (p_a,
     p_init,
@@ -83,7 +106,13 @@ function parse_paramter_file(filename::String)
     rho_0_air,
     rho_0_oil,
     gamma,
-    mu_resin)
+    mu_resin,
+    k_doc,
+    n_doc,
+    doc_a,
+    doc_init,
+    k_mu
+    )
 end
 
 """
@@ -102,7 +131,12 @@ function create_SimParameters(
     rho_0_air,
     rho_0_oil,
     gamma,
-    mu_resin) = parse_paramter_file(parameter_file)
+    mu_resin,
+    k_doc,
+    n_doc,
+    doc_a,
+    doc_init,
+    k_mu) = parse_paramter_file(parameter_file)
 
     if i_model == model_1::ModelType
         betat2 = 0.1
@@ -119,7 +153,12 @@ function create_SimParameters(
             ap2,
             ap3,
             kappa,
-            gamma
+            gamma,
+            k_doc,
+            n_doc,
+            doc_init,
+            doc_a,
+            k_mu
         )
     
     else
@@ -157,9 +196,14 @@ function create_SimParameters(
                 rho_0_oil,
                 rho_ref,
                 betat2_fac,
-                exp_val
+                exp_val,
+                k_doc,
+                n_doc,
+                doc_init,
+                doc_a,
+                k_mu
             )
-        else
+        elseif i_model == model_3::ModelType
             return Model_3(
                 p_a,
                 p_init,
@@ -172,7 +216,32 @@ function create_SimParameters(
                 rho_0_oil,
                 rho_ref,
                 betat2_fac,
-                exp_val
+                exp_val,
+                k_doc,
+                n_doc,
+                doc_init,
+                doc_a,
+                k_mu
+            )
+        elseif i_model == model_4::ModelType
+            return Model_4(
+                p_a,
+                p_init,
+                p_ref,
+                rho_a,
+                rho_init,
+                mu_resin,
+                betat2,
+                rho_0_air,
+                rho_0_oil,
+                rho_ref,
+                betat2_fac,
+                exp_val,
+                k_doc,
+                n_doc,
+                doc_init,
+                doc_a,
+                k_mu
             )
         end
     end
@@ -221,6 +290,7 @@ function create_initial_state(
     v = zeros(Float64, mesh.N) .+ V_INIT
     gamma = zeros(Float64, mesh.N) .+ GAMMA_INIT
     viscosity = zeros(Float64, mesh.N) .+ model.mu_resin
+    doc = zeros(Float64, mesh.N) .+ model.doc_init
 
     # set boundary conditions of inlet cells
     p[inlet_cells] .= model.p_a
@@ -228,6 +298,7 @@ function create_initial_state(
     u[inlet_cells] .= U_A
     v[inlet_cells] .= V_A
     gamma[inlet_cells] .= GAMMA_A
+    doc[inlet_cells] .= model.doc_a
     
 
     cellporositytimesporosityfactor = Vector{Float64}(undef, mesh.N)
@@ -250,6 +321,7 @@ function create_initial_state(
         u,
         v,
         viscosity,
-        cellporositytimesporosityfactor
+        cellporositytimesporosityfactor,
+        doc
     )
 end

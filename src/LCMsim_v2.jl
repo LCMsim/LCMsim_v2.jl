@@ -17,6 +17,7 @@ include("models/model_1.jl")
 include("models/model_2_3.jl")
 include("models/model_2.jl")
 include("models/model_3.jl")
+include("models/model_4.jl")
 
 export create, 
 create_and_solve,
@@ -279,7 +280,8 @@ function continue_and_solve(
         state_old.u,
         state_old.v,
         state.viscosity,
-        state.porosity_times_porosity
+        state.porosity_times_porosity,
+        state_old.doc
     )
 
     #COb: Apply new boundary conditions if changed
@@ -288,11 +290,13 @@ function continue_and_solve(
     state.v[case.mesh.inlet_cell_ids] .= V_A
     state.rho[case.mesh.inlet_cell_ids] .= case.model.rho_a
     state.gamma[case.mesh.inlet_cell_ids] .= GAMMA_A
+    state.doc[case.mesh.inlet_cell_ids] .= case.model.doc_a
     state.p[case.mesh.outlet_cell_ids] .= case.model.p_init
     state.u[case.mesh.outlet_cell_ids] .= U_INIT
     state.v[case.mesh.outlet_cell_ids] .= V_INIT
     state.rho[case.mesh.outlet_cell_ids] .= case.model.rho_init
     state.gamma[case.mesh.outlet_cell_ids] .= GAMMA_INIT
+    state.doc[case.mesh.outlet_cell_ids] .= case.model.doc_init
 
     if save_hdf
         save_plottable_mesh(case.mesh, hdf_path)
@@ -692,6 +696,63 @@ function numerical_flux_function_boundary(i_method, vars_P, vars_A, A, n_dot_u):
     return [F_rho_num_add, F_u_num_add, F_v_num_add, F_gamma_num_add, F_gamma_num1_add]
 end
 
+function numerical_flux_function_doc(i_method, vars_P, vars_A, face_normal, A)::Vector{Float64}
+    if i_method == 1
+        #first order upwinding
+        rho_P = vars_P[1]
+        u_P = vars_P[2]
+        v_P = vars_P[3]
+        gamma_P = vars_P[4]
+        doc_P = vars_P[5]
+
+        rho_A = vars_A[1]
+        u_A = vars_A[2]
+        v_A = vars_A[3]
+        gamma_A = vars_A[4]
+        doc_A = vars_A[5]
+        
+        n_dot_rhou1 = dot(face_normal, 0.5 * (rho_P + rho_A) * [0.5 * (u_P + u_A); 0.5 * (v_P + v_A)])
+        n_dot_u = dot(face_normal, [0.5 * (u_P + u_A); 0.5 * (v_P + v_A)])
+        if n_dot_rhou1 >= 0
+            phi = doc_P*gamma_P
+        else
+            phi = doc_A*gamma_A
+        end
+        F_doc_num_add = n_dot_u * phi * A
+        phi = 1
+        F_doc_num1_add = n_dot_u * phi * A
+    end
+    return [F_doc_num_add, F_doc_num1_add]
+end
+
+function numerical_flux_function_boundary_doc(i_method, vars_P, vars_A, A, n_dot_u)::Vector{Float64}
+    if i_method == 1
+        #first order upwinding
+        rho_P = vars_P[1]
+        u_P = vars_P[2]
+        v_P = vars_P[3]
+        gamma_P = vars_P[4]
+        doc_P = vars_P[5]
+
+        rho_A = vars_A[1]
+        u_A = vars_A[2]
+        v_A = vars_A[3]
+        gamma_A = vars_A[4]
+        doc_A = vars_A[5]
+
+        if n_dot_u <= 0
+            phi = doc_A*gamma_A
+        else
+            phi = doc_P*gamma_P
+        end
+        F_doc_num_add = n_dot_u * phi * A
+        phi = 1
+        F_doc_num1_add = n_dot_u * phi * A
+    end
+    return [F_doc_num_add, F_doc_num1_add]
+end
+
+
 """
     aggregate_neighour_flux(
         cell::LcmCell,
@@ -787,6 +848,103 @@ function aggregate_neighour_flux(
 end
 
 """
+    aggregate_neighour_flux_doc(
+        cell::LcmCell,
+        scaled_properties::ScaledProperties,
+        mesh::LcmMesh,
+        ∇p::Point2{Float64},
+        rho_old::Vector{Float64},
+        u_old::Vector{Float64},
+        v_old::Vector{Float64},
+        gamma_old::Vector{Float64},
+        doc_old::Vector{Float64},
+    )::Tuple{Float64, Float64}
+
+    Aggregates the neighbour flux numerically for the given cell and scaled properties.
+    Returns a tuple of the aggregated fluxes:
+        F_doc_num, 
+        F_doc_num1
+"""
+function aggregate_neighour_flux_doc(
+    cell::LcmCell,
+    scaled_properties::ScaledProperties,
+    mesh::LcmMesh,
+    ∇p::Point2{Float64},
+    rho_old::Vector{Float64},
+    u_old::Vector{Float64},
+    v_old::Vector{Float64},
+    gamma_old::Vector{Float64},
+    doc_old::Vector{Float64},
+)::Tuple{Float64, Float64} 
+
+    # corresponds to [F_doc_num, F_doc_num1]
+    numerical_flux = zeros(Float64, 2)
+
+    for (i_neighbour, neighbour) in enumerate(cell.neighbours)
+        # transform old u, v of neighbour into this cell's coordinates
+        uvec = neighbour.transformation * [u_old[neighbour.id]; v_old[neighbour.id]]
+        u_A = uvec[1]
+        v_A = uvec[2]
+    
+        vars_P = [
+            rho_old[cell.id], 
+            u_old[cell.id], 
+            v_old[cell.id], 
+            gamma_old[cell.id], 
+            doc_old[cell.id]
+        ]
+        
+        vars_A = [
+            rho_old[neighbour.id], 
+            u_A,
+            v_A, 
+            gamma_old[neighbour.id],
+            doc_old[neighbour.id]
+        ]
+
+        # scaled face area of i-th neighbour
+        A = scaled_properties.face[i_neighbour]
+
+        neighbour_cell = mesh.cells[neighbour.id]
+        neighbour_type = neighbour_cell.type
+        if neighbour_type == inner::CELLTYPE || neighbour_type == wall::CELLTYPE
+
+            numerical_flux .+= numerical_flux_function_doc(1, vars_P, vars_A, neighbour.face_normal, A)
+           
+        elseif neighbour_type == inlet::CELLTYPE || neighbour_type == outlet::CELLTYPE
+
+            A = A * cell.thickness / (0.5 * (cell.thickness + neighbour_cell.thickness)) # TODO thickness Factor?
+
+            if neighbour_type == outlet::CELLTYPE
+
+                n_dot_u = dot(neighbour.face_normal, [u_old[cell.id]; v_old[cell.id]])
+
+            elseif neighbour_type == inlet::CELLTYPE
+
+                n_dot_u = min(
+                    0, 
+                    -1 / scaled_properties.viscosity * dot(
+                        [scaled_properties.permeability 0; 0 scaled_properties.permeability * cell.alpha] * ∇p, # <=> [k1; k2] .* ∇p
+                        neighbour.face_normal
+                    )
+                )  #inflow according to Darcy's law and no backflow possible
+            end
+            numerical_flux .+= numerical_flux_function_boundary_doc(1, vars_P, vars_A, A, n_dot_u)
+        end
+    end
+
+    F_doc_num = numerical_flux[1]
+    F_doc_num1 = numerical_flux[2]
+
+    return F_doc_num, F_doc_num1
+end
+
+
+
+
+
+
+"""
     adaptive_timestep(
         model::AbstractModel,
         cells::Vector{LcmCell},
@@ -864,6 +1022,7 @@ function solve(
     v_old = deepcopy(old_state.v)
     viscosity = deepcopy(old_state.viscosity)
     cellporositytimesporosityfactor_old = deepcopy(old_state.porosity_times_porosity)
+    doc_old = deepcopy(old_state.doc)
 
     # vectors for new state; already here the boundary conditions are set because not changed inside t loop
     p_new = deepcopy(p_old)
@@ -871,6 +1030,7 @@ function solve(
     u_new = deepcopy(u_old)
     v_new = deepcopy(v_old)
     gamma_new = deepcopy(gamma_old)
+    doc_new = deepcopy(doc_old)
 
     if verbosity == verbose::Verbosity
         @info "Start solving at t = $t."
@@ -962,9 +1122,37 @@ function solve(
                 F_gamma_num1
             )
 
+            # aggregate neighbour flux for doc equation numerically only for model 4, otherwise set equal to zero
+            F_doc_num, F_doc_num1 = aggregate_neighour_flux_doc(
+                cell,
+                scaled_properties,
+                mesh,
+                ∇p,
+                rho_old,
+                u_old,
+                v_old,
+                gamma_old,
+                doc_old
+            )
+            doc_new[cell.id] = update_doc(
+                model,
+                Δt,
+                scaled_properties,
+                doc_old[cell.id],
+                gamma_old[cell.id],
+                gamma_new[cell.id],
+                F_doc_num,
+                F_doc_num1,
+                cellporositytimesporosityfactor_old[cell.id],
+                model.k_doc,
+                model.n_doc
+            )
+            
             viscosity[cell.id] = update_viscosity(
                 model,
-                scaled_properties
+                scaled_properties,
+                viscosity[cell.id],
+                doc_new[cell.id]
             )
 
             # update old state of this cell
@@ -973,6 +1161,7 @@ function solve(
             rho_old[cell.id] = rho_new[cell.id] + 0.0
             p_old[cell.id] = p_new[cell.id] + 0.0
             gamma_old[cell.id] = gamma_new[cell.id] + 0.0
+            doc_old[cell.id] = doc_new[cell.id] + 0.0
         end
 
         if verbosity == verbose::Verbosity
@@ -1023,7 +1212,8 @@ function solve(
         u_new,
         v_new,
         viscosity,
-        cellporositytimesporosityfactor_old
+        cellporositytimesporosityfactor_old, 
+        doc_new
     )
 end
 end # module LcmSimCore

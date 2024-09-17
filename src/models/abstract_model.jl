@@ -70,7 +70,9 @@ end
 
 function update_viscosity(
     model::AbstractModel,
-    scaled_properties::ScaledProperties
+    scaled_properties::ScaledProperties,
+    gamma_new::Float64,
+    doc_new::Float64
 )
     return scaled_properties.viscosity
 end
@@ -86,3 +88,20 @@ function scale_properties(
 
     error("This is an abstract function.")
 end
+
+function update_doc(
+    model::AbstractModel,
+    Δt::Float64, 
+    props::ScaledProperties,
+    doc_old::Float64, 
+    gamma_old::Float64,
+    gamma_new::Float64,
+    F_doc_num::Float64, 
+    F_doc_num1::Float64, 
+    cellporositytimescellporosityfactor_old::Float64,
+    k_doc::Float64, 
+    n_doc::Float64
+    )::Float64
+    
+    error("This is an abstract function.")
+end 

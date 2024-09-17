@@ -73,3 +73,22 @@ function scale_properties(
         cell.alpha
     )
 end
+
+function update_doc(
+    model::Model_1,
+    Δt::Float64, 
+    props::ScaledProperties,
+    doc_old::Float64, 
+    gamma_old::Float64,
+    gamma_new::Float64,
+    F_doc_num::Float64,  
+    F_doc_num1::Float64, 
+    cellporositytimescellporosityfactor_old::Float64,
+    k_doc::Float64, 
+    n_doc::Float64
+    )::Float64
+
+    doc_new = 0.0
+
+    return max(min(doc_new,1.0), 0.0)
+end

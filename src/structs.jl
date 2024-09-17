@@ -42,11 +42,13 @@ Enumeration representing different types of models.
 - `model_1`: Represents model 1.
 - `model_2`: Represents model 2.
 - `model_3`: Represents model 3.
+- `model_4`: Represents model 4.
 """
 @enum ModelType begin
     model_1 = 1
     model_2 = 2
-    model_3 = 3
+    model_3 = 3    
+    model_4 = 4
 end
 
 """
@@ -292,6 +294,11 @@ The `Model_1` struct represents a specific model that implements the `AbstractMo
 - `ap3::Float64`: Parameter `ap3`
 - `kappa::Float64`: Parameter `kappa`
 - `gamma::Float64`: Parameter `gamma`
+- `k_doc::Float64`: k factor in degree of cure source function
+- `n_doc::Float64`: n factor in degree of cure source function
+- `doc_init::Float64`: Initial degree of cure
+- `doc_a::Float64`: Inlet degree of cure
+- `k_mu::Float64`: k factor in viscosity calculation
 """
 struct Model_1 <: AbstractModel
     p_a::Float64
@@ -306,6 +313,11 @@ struct Model_1 <: AbstractModel
     ap3::Float64
     kappa::Float64
     gamma::Float64
+    k_doc::Float64
+    n_doc::Float64
+    doc_init::Float64    
+    doc_a::Float64
+    k_mu::Float64
 end
 
 """
@@ -331,6 +343,11 @@ Fields:
 - `rho_ref::Float64`: Reference density
 - `betat2_fac::Float64`: Beta times squared factor
 - `exp_val::Float64`: Exponential value
+- `k_doc::Float64`: k factor in degree of cure source function
+- `n_doc::Float64`: n factor in degree of cure source function
+- `doc_init::Float64`: Initial degree of cure
+- `doc_a::Float64`: Inlet degree of cure
+- `k_mu::Float64`: k factor in viscosity calculation
 
 """
 struct Model_2 <: Model_2_3
@@ -346,6 +363,11 @@ struct Model_2 <: Model_2_3
     rho_ref::Float64
     betat2_fac::Float64
     exp_val::Float64
+    k_doc::Float64
+    n_doc::Float64
+    doc_init::Float64    
+    doc_a::Float64
+    k_mu::Float64
 end
 
 """
@@ -366,6 +388,11 @@ It contains the following fields:
 - `rho_ref::Float64`: Reference density
 - `betat2_fac::Float64`: Beta times 2 factor
 - `exp_val::Float64`: Exponential value
+- `k_doc::Float64`: k factor in degree of cure source function
+- `n_doc::Float64`: n factor in degree of cure source function
+- `doc_init::Float64`: Initial degree of cure
+- `doc_a::Float64`: Inlet degree of cure
+- `k_mu::Float64`: k factor in viscosity calculation
 
 """
 struct Model_3 <: Model_2_3
@@ -381,7 +408,58 @@ struct Model_3 <: Model_2_3
     rho_ref::Float64
     betat2_fac::Float64
     exp_val::Float64
+    k_doc::Float64
+    n_doc::Float64
+    doc_init::Float64    
+    doc_a::Float64
+    k_mu::Float64
 end
+
+"""
+    struct Model_4 <: Model_2_3
+
+The `Model_4` struct represents a specific model that extends `Model_2_3`.
+
+Fields:
+- `p_a::Float64`: Pressure of air
+- `p_init::Float64`: Initial pressure
+- `p_ref::Float64`: Reference pressure
+- `rho_a::Float64`: Density of air
+- `rho_init::Float64`: Initial density
+- `mu_resin::Float64`: Resin viscosity
+- `betat2::Float64`: Beta times squared
+- `rho_0_air::Float64`: Reference density of air
+- `rho_0_oil::Float64`: Reference density of oil
+- `rho_ref::Float64`: Reference density
+- `betat2_fac::Float64`: Beta times squared factor
+- `exp_val::Float64`: Exponential value
+- `k_doc::Float64`: k factor in degree of cure source function
+- `n_doc::Float64`: n factor in degree of cure source function
+- `doc_init::Float64`: Initial degree of cure
+- `doc_a::Float64`: Inlet degree of cure
+- `k_mu::Float64`: k factor in viscosity calculation
+
+"""
+struct Model_4 <: Model_2_3
+    p_a::Float64
+    p_init::Float64
+    p_ref::Float64
+    rho_a::Float64
+    rho_init::Float64
+    mu_resin::Float64
+    betat2::Float64
+    rho_0_air::Float64
+    rho_0_oil::Float64
+    rho_ref::Float64
+    betat2_fac::Float64
+    exp_val::Float64
+    k_doc::Float64
+    n_doc::Float64
+    doc_init::Float64    
+    doc_a::Float64
+    k_mu::Float64
+end
+
 
 """
     struct State
@@ -399,6 +477,7 @@ The `State` struct represents the state of a simulation at a given time step.
 - `v::Vector{Float64}`: Velocity in the y-direction
 - `viscosity::Vector{Float64}`: Fluid viscosity values
 - `porosity_times_porosity::Vector{Float64}`: Product of porosity and porosity values
+- `doc::Vector{Float64}`: Degree of cure values
 
 """
 struct State
@@ -412,6 +491,7 @@ struct State
     v::Vector{Float64}
     viscosity::Vector{Float64}
     porosity_times_porosity::Vector{Float64}
+    doc::Vector{Float64}
 end
 
 """
