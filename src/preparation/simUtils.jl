@@ -125,6 +125,7 @@ function create_SimParameters(
     else
         rho_a, rho_init = calculate_physical_parameters_method_2_3(rho_0_air, rho_0_oil)
 
+        #initialize values
         betat2_fac = 1.
         exp_val = 1.
 
@@ -137,10 +138,14 @@ function create_SimParameters(
         #    exp_val = 4  #25;  #10;  #
         #end
         #COb: Linear functions of permeabiliity ratio
-        exp_val=floor(4+(25-4)/(1250-1)*(mesh.permeability_ratio-1))
-        betat2_fac=1.0+(0.01-1.0)/(1250-1)*(mesh.permeability_ratio-1)
+        #exp_val=floor(4+(25-4)/(1250-1)*(mesh.permeability_ratio-1))
+        #betat2_fac=1.0+(0.01-1.0)/(1250-1)*(mesh.permeability_ratio-1)
         #@info "betat2_fac = $betat2_fac"  #COb
         #@info "exp_val = $exp_val"  #COb 
+
+        #Linear function of permeability ratio must be improved. In the mean time, use this general values:
+        exp_val=25 
+        betat2_fac=0.1
 
         betat2= 0.1 * betat2_fac;
 
