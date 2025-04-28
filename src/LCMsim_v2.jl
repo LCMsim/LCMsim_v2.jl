@@ -45,7 +45,8 @@ LcmMesh
         meshfile::String,
         partfile::String,
         simfile::String,
-        i_model::ModelType
+        i_model::ModelType,
+        i_advanced::Int64
     )::LcmCase
 
     Creates a mesh, a model and an initial state from the given files.
@@ -57,11 +58,12 @@ function create(
     meshfile::String,
     partfile::String,
     simfile::String,
-    i_model::ModelType
+    i_model::ModelType,
+    i_advanced::Int64
 )::LcmCase
 
-mesh = create_LcmMesh(meshfile, partfile)
-    model = create_SimParameters(mesh, simfile, i_model) 
+    mesh = create_LcmMesh(meshfile, partfile)
+    model = create_SimParameters(mesh, simfile, i_model, i_advanced) 
     state = create_initial_state(mesh, model)
 
     case = LcmCase(
@@ -80,6 +82,7 @@ end
         partfile::String,
         simfile::String,
         i_model::ModelType,
+        i_advanced::Int64,
         save_path::String,
         save_binary::Bool=true,
         save_hdf::Bool=true
@@ -97,6 +100,7 @@ function create(
     partfile::String,
     simfile::String,
     i_model::ModelType,
+    i_advanced::Int64,
     save_path::String,
     save_binary::Bool=true,
     save_hdf::Bool=true
@@ -109,7 +113,8 @@ function create(
         meshfile,
         partfile,
         simfile,
-        i_model
+        i_model,
+        i_advanced
     )
 
     if save_hdf
@@ -131,6 +136,7 @@ end
         partfile::String,
         simfile::String,
         i_model::ModelType,
+        i_advanced::Int64,
         t_max::Float64,
         t_step::Float64,
         verbosity=verbose::Verbosity,
@@ -151,11 +157,12 @@ function create_and_solve(
     partfile::String,
     simfile::String,
     i_model::ModelType,
+    i_advanced::Int64,
     t_max::Float64,
     t_step=Float64(0.0),
     verbosity=verbose::Verbosity,
     save_binary::Bool=true,
-    save_hdf::Bool=true  
+    save_hdf::Bool=true
 )::Nothing
 
     # check if path exists and get paths to data.h5 and data.jld2
@@ -167,6 +174,7 @@ function create_and_solve(
         partfile,
         simfile,
         i_model,
+        i_advanced,
         save_path,
         save_binary,
         save_hdf
@@ -219,6 +227,7 @@ end
         partfile::String,
         simfile::String,
         i_model::ModelType,
+        i_advanced::Int64,
         t_max::Float64,
         output_intervals::Int,
         verbosity=verbose::Verbosity,
@@ -243,11 +252,12 @@ function continue_and_solve(
     partfile::String,
     simfile::String,
     i_model::ModelType,
+    i_advanced::Int64,
     t_max::Float64,
     output_intervals=Int(4),
     verbosity=verbose::Verbosity,
     save_binary::Bool=true,
-    save_hdf::Bool=true  
+    save_hdf::Bool=true
 )::Nothing
 
     case_old = load_case(source_path)
@@ -263,6 +273,7 @@ function continue_and_solve(
         partfile,
         simfile,
         i_model,
+        i_advanced,
         save_path
     )
     # retrieve initial state
@@ -340,6 +351,7 @@ end
         partfile::String,
         simfile::String,
         i_model::ModelType,
+        i_advanced::Int64,
         t_max::Float64,
         t_step::Float64,
         verbosity=verbose::Verbosity,
@@ -355,14 +367,15 @@ function create_and_solve_gui(
     partfile::String,
     simfile::String,
     i_model::ModelType,
+    i_advanced::Int64,
     t_max::Float64,
     output_intervals::Int,
     verbosity=verbose::Verbosity,
     save_binary::Bool=true,
-    save_hdf::Bool=true  
+    save_hdf::Bool=true
 )::Nothing
     t_step=t_max/output_intervals
-    create_and_solve(save_path,meshfile,partfile,simfile,i_model,t_max,t_step,verbosity,save_binary,save_hdf)
+    create_and_solve(save_path,meshfile,partfile,simfile,i_model,i_advanced,t_max,t_step,verbosity,save_binary,save_hdf)
 end
 
 """
@@ -373,6 +386,7 @@ end
         partfile::String,
         simfile::String,
         i_model::ModelType,
+        i_advanced::Int64,
         t_max::Float64,
         output_intervals::Int,
         verbosity=verbose::Verbosity,
@@ -389,13 +403,14 @@ function continue_and_solve_gui(
     partfile::String,
     simfile::String,
     i_model::ModelType,
+    i_advanced::Int64,
     t_max::Float64,
     output_intervals=Int(4),
     verbosity=verbose::Verbosity,
     save_binary::Bool=true,
-    save_hdf::Bool=true  
+    save_hdf::Bool=true
 )::Nothing
-    continue_and_solve(source_path,save_path,meshfile,partfile,simfile,i_model,t_max,output_intervals,verbosity,save_binary,save_hdf)
+    continue_and_solve(source_path,save_path,meshfile,partfile,simfile,i_model,i_advanced,t_max,output_intervals,verbosity,save_binary,save_hdf)
 end
 
 

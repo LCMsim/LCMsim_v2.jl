@@ -93,7 +93,8 @@ end
 function create_SimParameters(
     mesh::LcmMesh, 
     parameter_file::String, 
-    i_model::ModelType
+    i_model::ModelType,
+    i_advanced::Int64
 )::AbstractModel
     (p_a,
     p_init,
@@ -106,7 +107,7 @@ function create_SimParameters(
 
     if i_model == model_1::ModelType
         betat2 = 0.1
-        p_a, p_init, p_ref, rho_a, rho_init, kappa, ap1, ap2, ap3 = calculate_physical_parameters_method_1(p_a, p_init, p_ref, rho_ref, gamma)
+        p_a, p_init, p_ref, rho_a, rho_init, kappa, ap1, ap2, ap3 = calculate_physical_parameters_method_1(Float64(p_a), Float64(p_init), Float64(p_ref), Float64(rho_ref), Float64(gamma))
         return Model_1(
             p_a,
             p_init,
@@ -144,8 +145,19 @@ function create_SimParameters(
         #@info "exp_val = $exp_val"  #COb 
 
         #Linear function of permeability ratio must be improved. In the mean time, use this general values:
-        exp_val=25 
-        betat2_fac=0.1
+        #exp_val=25 
+        #betat2_fac=0.1
+
+        if i_advanced==0
+            exp_val=4 
+            betat2_fac=1.0
+        elseif i_advanced==1
+            exp_val=25 
+            betat2_fac=0.1   
+        elseif i_advanced==2
+            exp_val=25 
+            betat2_fac=0.01     
+        end    
 
         betat2= 0.1 * betat2_fac;
 
